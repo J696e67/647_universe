@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>647号宇宙</title>
+<style>
+*{margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#000}
+body{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+canvas{display:block}
+#title{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:2.5em;font-family:'Songti SC','STSong','SimSun','Noto Serif CJK SC',serif;
+  text-shadow:0 0 30px rgba(255,255,255,0.3);opacity:0;animation:titleFade 4s ease-in-out forwards;
+  pointer-events:none;z-index:10;letter-spacing:0.2em}
+@keyframes titleFade{0%{opacity:0}25%{opacity:1}75%{opacity:1}100%{opacity:0}}
+#text{position:fixed;bottom:12%;left:50%;transform:translateX(-50%);color:#fff;
+  font-size:1.1em;font-family:'Songti SC','STSong','SimSun','Noto Serif CJK SC',serif;
+  text-shadow:0 2px 10px rgba(0,0,0,0.9);opacity:0;transition:opacity 1s;
+  pointer-events:none;z-index:5;text-align:center;max-width:85%;line-height:2}
+#hint{position:fixed;bottom:5%;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.3);
+  font-size:0.75em;font-family:sans-serif;pointer-events:none;z-index:5;opacity:0;transition:opacity 1.5s}
+#chat{position:fixed;bottom:6%;left:50%;transform:translateX(-50%);width:88%;max-width:420px;
+  z-index:20;opacity:0;transition:opacity 0.6s;pointer-events:none}
+#chat.active{opacity:1;pointer-events:auto}
+#chat-msgs{max-height:180px;overflow-y:auto;margin-bottom:8px;padding:10px 12px;
+  background:rgba(0,0,0,0.55);border-radius:10px;backdrop-filter:blur(4px);
+  font-family:'Songti SC','STSong','SimSun',serif;color:#ccc;font-size:0.9em;line-height:1.7}
+#chat-msgs:empty{display:none}
+.chat-msg{margin:4px 0;word-break:break-word}
+.chat-msg.user{color:#a0c8f0;text-align:right}
+.chat-msg.ai{color:#e0d4b8}
+#chat-input-wrap{display:flex;gap:6px}
+#chat-in{flex:1;padding:8px 14px;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.15);
+  border-radius:20px;color:#fff;font-size:0.9em;outline:none;font-family:sans-serif}
+#chat-in::placeholder{color:rgba(255,255,255,0.3)}
+#chat-send{padding:8px 16px;background:rgba(255,255,255,0.12);border:none;border-radius:20px;
+  color:#fff;font-size:1em;cursor:pointer}
+#chat-send:active{background:rgba(255,255,255,0.25)}
+#fade{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;opacity:0;
+  transition:opacity 0.5s;pointer-events:none;z-index:15}
+#maze-hint{position:fixed;bottom:20%;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.6);
+  font-size:0.9em;font-family:'Songti SC','STSong','SimSun',serif;pointer-events:none;z-index:5;
+  opacity:0;transition:opacity 0.5s;text-shadow:0 2px 8px rgba(0,0,0,0.8)}
+</style>
+</head>
+<body>
+<div id="title">647号宇宙</div>
+<div id="text"></div>
+<div id="hint"></div>
+<div id="fade"></div>
+<div id="maze-hint"></div>
+<div id="chat">
+  <div id="chat-msgs"></div>
+  <div id="chat-input-wrap">
+    <input id="chat-in" type="text" placeholder="与墓碑对话..." autocomplete="off">
+    <button id="chat-send">&rarr;</button>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function() {
+'use strict';
+
+// ===================== CONSTANTS =====================
+var W = 200, HW = 100;
+var TSIZE = 400, TSEG = 150;
+var FOG_NEAR = 1, FOG_FAR = 65;
+var EYE = 1.6, SPD = 5.25;
+var CYCLE = 180;
+var N_WHEAT = 2000, N_TREE = 18;
+var STR_X = 20;
+var HSE_X = -15, HSE_Z = -10;
+var WATER_Y = -0.25;
+var TMB_X = 99, TMB_Z = 0;
+var MCOLS = 16, MROWS = 16, MCELL = 4;
+var MAZE_Y = -50, MAZE_WALL_H = 3.0;
+var MSIZE = MCOLS * MCELL, MHALF = MSIZE / 2;
+
+// ===================== GLOBALS =====================
+var scene, cam, ren, clk;
+var px = 0, pz = 8, yaw = -0.3;
+var keys = {};
+var tch = { on: false, sx: 0, sy: 0, cx: 0, cy: 0, t0: 0 };
+var txtTimer = null;
+var actx = null, audioOn = false;
+var windGain, streamGain;
+var sunLight, ambLight, skyUni;
+var wheatMesh, wheatData = [];
+var waterGeo1, waterGeo2;
+var bookPos, tombPos;
+var starsMesh;
+var sunMesh, moonMesh;
+var pLocked = false;
+var dummy = new THREE.Object3D();
+var hintEl, hintShown = false;
+var houseWallSegs = [];
+var tombRings = [];
+var tombChatInited = false;
+var inMaze = false, mpx = 0, mpz = 0;
+var savedOutdoorPos = { x: 0, z: 0, yaw: 0 };
+var mazeH = [], mazeV = [];
+var mazeMesh, mazeFloor, mazeCeiling, mazePanels;
+var mazeLights = [], mazePlayerLight;
+var mazeExitReady = false;
+var mazeHumNodes = [];
+var mazeSeed = 647;
+var fadeEl, mazeHintEl;
+
+// ===================== TERRAIN HEIGHT =====================
+function baseH(x, z) {
+  var s = Math.PI * 2 / W;
+  return 1.8 * Math.sin(s * x + 0.3) * Math.cos(s * z + 0.7)
+       + 1.0 * Math.sin(2 * s * x + 1.1)
+       + 0.7 * Math.cos(2 * s * z + 0.4)
+       + 0.4 * Math.sin(3 * s * x + 2) * Math.cos(2 * s * z)
+       + 0.2 * Math.cos(4 * s * x) * Math.sin(3 * s * z + 1);
+}
+
+function tH(x, z) {
+  var h = baseH(x, z);
+  // Stream depression (periodic)
+  var sd = ((x - STR_X) % W + W) % W;
+  if (sd > HW) sd = W - sd;
+  if (sd < 5) {
+    var t = sd / 5;
+    h = h * t * t + (-0.6) * (1 - t * t);
+  }
+  // Flatten around house
+  var hx = x - HSE_X; hx -= W * Math.round(hx / W);
+  var hz = z - HSE_Z; hz -= W * Math.round(hz / W);
+  var hd = Math.sqrt(hx * hx + hz * hz);
+  if (hd < 7) {
+    var t2 = hd / 7;
+    h = h * t2 * t2 + 0.3 * (1 - t2 * t2);
+  }
+  // Flatten around maze entrance at (0,0)
+  var ex = x; ex -= W * Math.round(ex / W);
+  var ez = z; ez -= W * Math.round(ez / W);
+  var ed = Math.sqrt(ex * ex + ez * ez);
+  if (ed < 5) {
+    var t3 = ed / 5;
+    h = h * t3 * t3 + 0.0 * (1 - t3 * t3);
+  }
+  return h;
+}
+
+function groundH(x, z) { return Math.max(tH(x, z), WATER_Y); }
+
+function smoothstep(a, b, x) {
+  var t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+
+function pDist(x1, z1, x2, z2) {
+  var dx = x1 - x2, dz = z1 - z2;
+  dx -= W * Math.round(dx / W);
+  dz -= W * Math.round(dz / W);
+  return Math.sqrt(dx * dx + dz * dz);
+}
+
+// ===================== TERRAIN =====================
+function createTerrain() {
+  var geo = new THREE.PlaneGeometry(TSIZE, TSIZE, TSEG, TSEG);
+  geo.rotateX(-Math.PI / 2);
+  var pos = geo.attributes.position.array;
+  var n = pos.length / 3;
+  var col = new Float32Array(n * 3);
+
+  for (var i = 0; i < n; i++) {
+    var x = pos[i * 3], z = pos[i * 3 + 2];
+    var y = tH(x, z);
+    pos[i * 3 + 1] = y;
+
+    var hn = (y + 3) / 7;
+    var r = 0.28 + hn * 0.12;
+    var g = 0.38 + hn * 0.15;
+    var b = 0.15 + hn * 0.05;
+
+    // Darker near stream
+    var sd = ((x - STR_X) % W + W) % W;
+    if (sd > HW) sd = W - sd;
+    if (sd < 6) {
+      var t = sd / 6;
+      r = r * t + 0.12 * (1 - t);
+      g = g * t + 0.28 * (1 - t);
+      b = b * t + 0.18 * (1 - t);
+    }
+    col[i * 3] = r;
+    col[i * 3 + 1] = g;
+    col[i * 3 + 2] = b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.computeVertexNormals();
+
+  var mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  scene.add(new THREE.Mesh(geo, mat));
+}
+
+// ===================== SKY =====================
+function createSky() {
+  var geo = new THREE.SphereGeometry(180, 16, 12);
+  var mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+    uniforms: {
+      topColor: { value: new THREE.Color(0.4, 0.65, 0.95) },
+      botColor: { value: new THREE.Color(0.82, 0.72, 0.55) },
+      offset: { value: 10.0 },
+      exponent: { value: 0.6 }
+    },
+    vertexShader: [
+      'varying vec3 vPos;',
+      'void main() {',
+      '  vPos = position;',
+      '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+      '}'
+    ].join('\n'),
+    fragmentShader: [
+      'uniform vec3 topColor;',
+      'uniform vec3 botColor;',
+      'uniform float offset;',
+      'uniform float exponent;',
+      'varying vec3 vPos;',
+      'void main() {',
+      '  float h = normalize(vPos + vec3(0.0, offset, 0.0)).y;',
+      '  float t = pow(max(h, 0.0), exponent);',
+      '  gl_FragColor = vec4(mix(botColor, topColor, t), 1.0);',
+      '}'
+    ].join('\n')
+  });
+  skyUni = mat.uniforms;
+  scene.add(new THREE.Mesh(geo, mat));
+}
+
+// ===================== STARS =====================
+function createStars() {
+  var n = 600;
+  var pos = new Float32Array(n * 3);
+  for (var i = 0; i < n; i++) {
+    var theta = Math.random() * Math.PI * 2;
+    var phi = Math.acos(0.2 + Math.random() * 0.8);
+    var r = 170;
+    pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    pos[i * 3 + 1] = r * Math.cos(phi);
+    pos[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+  }
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  var mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.7, fog: false, transparent: true, opacity: 0 });
+  starsMesh = new THREE.Points(geo, mat);
+  scene.add(starsMesh);
+}
+
+// ===================== WHEAT FIELD =====================
+function createWheat() {
+  var geo = new THREE.PlaneGeometry(0.04, 0.7, 1, 3);
+  geo.translate(0, 0.35, 0);
+  var mat = new THREE.MeshLambertMaterial({ color: 0xDAA520, side: THREE.DoubleSide });
+  wheatMesh = new THREE.InstancedMesh(geo, mat, N_WHEAT);
+
+  var placed = 0;
+  while (placed < N_WHEAT) {
+    var x = -60 + Math.random() * 75;
+    var z = -45 + Math.random() * 90;
+
+    // Avoid house
+    var dx = x - HSE_X, dz = z - HSE_Z;
+    if (Math.sqrt(dx * dx + dz * dz) < 9) continue;
+    // Avoid entrance
+    if (Math.sqrt(x * x + z * z) < 5) continue;
+
+    // Avoid stream
+    var sd = ((x - STR_X) % W + W) % W;
+    if (sd > HW) sd = W - sd;
+    if (sd < 4) continue;
+
+    var y = tH(x, z);
+    if (y < WATER_Y + 0.1) continue;
+
+    wheatData.push({
+      x: x, y: y, z: z,
+      ry: Math.random() * Math.PI,
+      sy: 0.7 + Math.random() * 0.6
+    });
+
+    dummy.position.set(x, y, z);
+    dummy.rotation.set(0, wheatData[placed].ry, 0);
+    dummy.scale.set(1, wheatData[placed].sy, 1);
+    dummy.updateMatrix();
+    wheatMesh.setMatrixAt(placed, dummy.matrix);
+    placed++;
+  }
+  wheatMesh.instanceMatrix.needsUpdate = true;
+  scene.add(wheatMesh);
+}
+
+function updateWheat(t) {
+  for (var i = 0; i < wheatData.length; i++) {
+    var d = wheatData[i];
+    var sway = Math.sin(t * 1.5 + d.x * 0.3 + d.z * 0.5) * 0.08
+             + Math.sin(t * 0.8 + d.x * 0.7) * 0.04;
+    dummy.position.set(d.x, d.y, d.z);
+    dummy.rotation.set(0, d.ry, sway);
+    dummy.scale.set(1, d.sy, 1);
+    dummy.updateMatrix();
+    wheatMesh.setMatrixAt(i, dummy.matrix);
+  }
+  wheatMesh.instanceMatrix.needsUpdate = true;
+}
+
+// ===================== TREES =====================
+function createTrees() {
+  var trunkGeo = new THREE.CylinderGeometry(0.12, 0.18, 2.5, 6);
+  trunkGeo.translate(0, 1.25, 0);
+  var trunkMat = new THREE.MeshLambertMaterial({ color: 0x5C3A1E });
+
+  var leafGeo = new THREE.SphereGeometry(1.3, 6, 5);
+  leafGeo.translate(0, 3.2, 0);
+  var leafMat = new THREE.MeshLambertMaterial({ color: 0x2D5A1E });
+
+  var coneGeo = new THREE.ConeGeometry(1.2, 2.5, 6);
+  coneGeo.translate(0, 3.8, 0);
+  var coneMat = new THREE.MeshLambertMaterial({ color: 0x1E4A0E });
+
+  for (var i = 0; i < N_TREE; i++) {
+    var x, z, attempts = 0;
+    do {
+      x = -65 + Math.random() * 130;
+      z = -65 + Math.random() * 130;
+      attempts++;
+      if (attempts > 100) break;
+    } while (
+      Math.sqrt((x - HSE_X) * (x - HSE_X) + (z - HSE_Z) * (z - HSE_Z)) < 10 ||
+      (function() { var s = ((x - STR_X) % W + W) % W; if (s > HW) s = W - s; return s < 5; })()
+    );
+
+    var y = tH(x, z);
+    if (y < WATER_Y + 0.2) continue;
+
+    var scale = 0.7 + Math.random() * 0.5;
+    var trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.set(x, y, z);
+    trunk.scale.set(scale, scale, scale);
+    scene.add(trunk);
+
+    // Alternate between sphere and cone canopy
+    if (i % 3 === 0) {
+      var leaf = new THREE.Mesh(coneGeo, coneMat);
+      leaf.position.set(x, y, z);
+      leaf.scale.set(scale, scale * (0.8 + Math.random() * 0.4), scale);
+      scene.add(leaf);
+    } else {
+      var leaf2 = new THREE.Mesh(leafGeo, leafMat);
+      leaf2.position.set(x, y, z);
+      leaf2.scale.set(scale * (0.8 + Math.random() * 0.4), scale, scale * (0.8 + Math.random() * 0.4));
+      scene.add(leaf2);
+    }
+  }
+}
+
+// ===================== STREAM =====================
+function createStream() {
+  var waterW = 5, waterL = W + 40;
+  var geo1 = new THREE.PlaneGeometry(waterW, waterL, 4, 40);
+  geo1.rotateX(-Math.PI / 2);
+  var geo2 = new THREE.PlaneGeometry(waterW, waterL, 4, 40);
+  geo2.rotateX(-Math.PI / 2);
+
+  var mat = new THREE.MeshBasicMaterial({
+    color: 0x4499AA,
+    transparent: true,
+    opacity: 0.5,
+    side: THREE.DoubleSide
+  });
+
+  var water1 = new THREE.Mesh(geo1, mat);
+  water1.position.set(STR_X, WATER_Y, 0);
+  scene.add(water1);
+
+  var water2 = new THREE.Mesh(geo2, mat.clone());
+  water2.position.set(STR_X - W, WATER_Y, 0);
+  scene.add(water2);
+
+  waterGeo1 = geo1;
+  waterGeo2 = geo2;
+}
+
+function updateWater(t) {
+  function ripple(geo) {
+    var pos = geo.attributes.position.array;
+    for (var i = 0; i < pos.length; i += 3) {
+      pos[i + 1] = Math.sin(t * 2 + pos[i + 2] * 0.15) * 0.04
+                 + Math.sin(t * 3.5 + pos[i] * 1.5) * 0.02;
+    }
+    geo.attributes.position.needsUpdate = true;
+  }
+  ripple(waterGeo1);
+  ripple(waterGeo2);
+}
+
+// ===================== HOUSE =====================
+function createHouse() {
+  var mx = HSE_X, mz = HSE_Z;
+  var gy = tH(mx, mz);
+  var ww = 5, wh = 2.8, wd = 5, wt = 0.12;
+
+  var wallMat = new THREE.MeshLambertMaterial({ color: 0x8B7355 });
+  var roofMat = new THREE.MeshLambertMaterial({ color: 0x6B4226 });
+  var floorMat = new THREE.MeshLambertMaterial({ color: 0x7B6B5A });
+
+  function box(w, h, d, lx, ly, lz, m) {
+    var g = new THREE.BoxGeometry(w, h, d);
+    var mesh = new THREE.Mesh(g, m || wallMat);
+    mesh.position.set(mx + lx, gy + ly, mz + lz);
+    scene.add(mesh);
+    return mesh;
+  }
+
+  // Walls
+  box(ww, wh, wt, 0, wh / 2, -wd / 2);             // back
+  box(wt, wh, wd, -ww / 2, wh / 2, 0);              // left
+  box(wt, wh, wd, ww / 2, wh / 2, 0);               // right
+  box(ww / 2 - 0.5, wh, wt, -(ww / 4 + 0.25), wh / 2, wd / 2);  // front left
+  box(ww / 2 - 0.5, wh, wt, ww / 4 + 0.25, wh / 2, wd / 2);     // front right
+  box(1.0, wh - 2.0, wt, 0, wh - (wh - 2) / 2, wd / 2);          // above door
+
+  // Roof
+  box(ww + 0.6, 0.15, wd + 0.6, 0, wh + 0.075, 0, roofMat);
+
+  // Floor
+  box(ww, 0.08, wd, 0, 0.04, 0, floorMat);
+
+  // Furniture
+  var fMat = new THREE.MeshLambertMaterial({ color: 0x9B7B5A });
+
+  // Desk against back wall
+  box(1.2, 0.72, 0.55, -0.8, 0.36, -1.7, fMat);
+
+  // Chair
+  box(0.42, 0.4, 0.42, -0.8, 0.2, -0.8, fMat);
+  box(0.42, 0.5, 0.06, -0.8, 0.65, -0.59, fMat);
+
+  // Book on desk
+  var bMat = new THREE.MeshLambertMaterial({ color: 0x8B0000 });
+  box(0.22, 0.03, 0.16, -0.8, 0.735, -1.7, bMat);
+
+  bookPos = new THREE.Vector3(mx - 0.8, gy + 0.735, mz - 1.7);
+
+  // Wall collision segments (AABB)
+  houseWallSegs = [
+    { x1: mx - ww/2, z1: mz - wd/2 - wt/2, x2: mx + ww/2, z2: mz - wd/2 + wt/2 },       // back
+    { x1: mx - ww/2 - wt/2, z1: mz - wd/2, x2: mx - ww/2 + wt/2, z2: mz + wd/2 },         // left
+    { x1: mx + ww/2 - wt/2, z1: mz - wd/2, x2: mx + ww/2 + wt/2, z2: mz + wd/2 },         // right
+    { x1: mx - ww/2, z1: mz + wd/2 - wt/2, x2: mx - 0.5, z2: mz + wd/2 + wt/2 },          // front-left
+    { x1: mx + 0.5, z1: mz + wd/2 - wt/2, x2: mx + ww/2, z2: mz + wd/2 + wt/2 },          // front-right
+  ];
+}
+
+function houseCollide(x, z) {
+  var pad = 0.35;
+  for (var i = 0; i < houseWallSegs.length; i++) {
+    var w = houseWallSegs[i];
+    if (x > w.x1 - pad && x < w.x2 + pad && z > w.z1 - pad && z < w.z2 + pad) return true;
+  }
+  return false;
+}
+
+// ===================== TOMBSTONE (RING) =====================
+function createTombstone() {
+  var ringMat = new THREE.MeshLambertMaterial({ color: 0x8898A8 });
+  var baseMat = new THREE.MeshLambertMaterial({ color: 0x607070 });
+
+  function makeRing(sx, sz) {
+    var sy = tH(sx, sz);
+    // Stone base
+    var baseGeo = new THREE.CylinderGeometry(0.5, 0.7, 0.4, 8);
+    var base = new THREE.Mesh(baseGeo, baseMat);
+    base.position.set(sx, sy + 0.2, sz);
+    scene.add(base);
+    // Thin pillar
+    var pillarGeo = new THREE.CylinderGeometry(0.06, 0.06, 1.0, 6);
+    var pillar = new THREE.Mesh(pillarGeo, baseMat);
+    pillar.position.set(sx, sy + 0.9, sz);
+    scene.add(pillar);
+    // Torus ring
+    var torusGeo = new THREE.TorusGeometry(1.0, 0.07, 12, 36);
+    var torus = new THREE.Mesh(torusGeo, ringMat);
+    torus.position.set(sx, sy + 2.0, sz);
+    torus.userData.baseY = sy + 2.0;
+    scene.add(torus);
+    tombRings.push(torus);
+  }
+
+  makeRing(TMB_X, TMB_Z);
+  makeRing(TMB_X - W, TMB_Z);
+  tombPos = new THREE.Vector3(TMB_X, tH(TMB_X, TMB_Z) + 1.0, TMB_Z);
+}
+
+function updateTombstone(t) {
+  for (var i = 0; i < tombRings.length; i++) {
+    var ring = tombRings[i];
+    ring.rotation.y = t * 0.3;
+    ring.rotation.x = Math.sin(t * 0.5) * 0.12;
+    ring.position.y = ring.userData.baseY + Math.sin(t * 0.7) * 0.08;
+  }
+}
+
+// ===================== SUN & MOON =====================
+function createCelestial() {
+  var sunGeo = new THREE.SphereGeometry(4, 8, 8);
+  var sunMat = new THREE.MeshBasicMaterial({ color: 0xFFDD44, fog: false });
+  sunMesh = new THREE.Mesh(sunGeo, sunMat);
+  scene.add(sunMesh);
+
+  var moonGeo = new THREE.SphereGeometry(2.5, 8, 8);
+  var moonMat = new THREE.MeshBasicMaterial({ color: 0xCCCCDD, fog: false });
+  moonMesh = new THREE.Mesh(moonGeo, moonMat);
+  scene.add(moonMesh);
+}
+
+// ===================== LIGHTING =====================
+function setupLights() {
+  sunLight = new THREE.DirectionalLight(0xffeedd, 0.8);
+  sunLight.position.set(50, 80, 30);
+  scene.add(sunLight);
+
+  ambLight = new THREE.AmbientLight(0x6688aa, 0.35);
+  scene.add(ambLight);
+}
+
+// ===================== DAY / NIGHT CYCLE =====================
+function updateDayNight(elapsed) {
+  var phase = (elapsed % CYCLE) / CYCLE;
+  var angle = phase * Math.PI * 2;
+  var sunH = Math.sin(angle);
+
+  // Sun position
+  var sunDist = 150;
+  sunLight.position.set(Math.cos(angle) * sunDist, Math.max(sunH * sunDist, 5), 30);
+
+  // Day factor
+  var day = smoothstep(-0.15, 0.3, sunH);
+  // Sunset factor
+  var sunset = Math.exp(-Math.pow(sunH * 5, 2)) * (sunH > -0.3 ? 1 : 0);
+
+  // Light intensity
+  sunLight.intensity = day * 0.7 + 0.08;
+  ambLight.intensity = day * 0.3 + 0.12;
+
+  // Sun color
+  var warmth = 0.08 + day * 0.04;
+  var sat = 0.25 + sunset * 0.5;
+  sunLight.color.setHSL(warmth, sat, 0.7 + day * 0.25);
+
+  // Sky colors
+  var dayT  = [0.40, 0.65, 0.95];
+  var dayB  = [0.82, 0.72, 0.55];
+  var nightT = [0.01, 0.01, 0.06];
+  var nightB = [0.03, 0.03, 0.10];
+  var ssetT  = [0.55, 0.25, 0.45];
+  var ssetB  = [0.95, 0.55, 0.30];
+
+  function lerp3(a, b, t) { return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; }
+
+  var top = lerp3(nightT, dayT, day);
+  var bot = lerp3(nightB, dayB, day);
+  top = lerp3(top, ssetT, sunset * 0.5);
+  bot = lerp3(bot, ssetB, sunset * 0.7);
+
+  skyUni.topColor.value.setRGB(top[0], top[1], top[2]);
+  skyUni.botColor.value.setRGB(bot[0], bot[1], bot[2]);
+
+  scene.fog.color.setRGB(bot[0], bot[1], bot[2]);
+  ren.setClearColor(scene.fog.color);
+
+  // Stars — rotate with celestial sphere
+  starsMesh.material.opacity = Math.max(0, (1 - day) * 1.2 - 0.1);
+  starsMesh.rotation.z = angle;
+
+  // Sun mesh
+  sunMesh.position.set(Math.cos(angle) * sunDist, sunH * sunDist, 30);
+  sunMesh.visible = sunH > -0.05;
+  sunMesh.material.color.setHSL(0.12, 0.9 - day * 0.5, 0.6 + day * 0.3);
+
+  // Moon mesh
+  moonMesh.position.set(-Math.cos(angle) * sunDist, -sunH * sunDist, -30);
+  moonMesh.visible = sunH < 0.15;
+}
+
+// ===================== AUDIO =====================
+function initAudio() {
+  if (audioOn) return;
+  try {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+  } catch(e) { return; }
+  audioOn = true;
+
+  // Wind: filtered white noise
+  var windBuf = actx.createBuffer(1, actx.sampleRate * 4, actx.sampleRate);
+  var windArr = windBuf.getChannelData(0);
+  for (var i = 0; i < windArr.length; i++) windArr[i] = Math.random() * 2 - 1;
+  var windSrc = actx.createBufferSource();
+  windSrc.buffer = windBuf;
+  windSrc.loop = true;
+  var windFilt = actx.createBiquadFilter();
+  windFilt.type = 'lowpass';
+  windFilt.frequency.value = 350;
+  windFilt.Q.value = 0.5;
+  windGain = actx.createGain();
+  windGain.gain.value = 0.07;
+  windSrc.connect(windFilt);
+  windFilt.connect(windGain);
+  windGain.connect(actx.destination);
+  windSrc.start();
+
+  // Stream: filtered noise
+  var strmBuf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+  var strmArr = strmBuf.getChannelData(0);
+  for (var i2 = 0; i2 < strmArr.length; i2++) strmArr[i2] = Math.random() * 2 - 1;
+  var strmSrc = actx.createBufferSource();
+  strmSrc.buffer = strmBuf;
+  strmSrc.loop = true;
+  var strmFilt = actx.createBiquadFilter();
+  strmFilt.type = 'bandpass';
+  strmFilt.frequency.value = 900;
+  strmFilt.Q.value = 1.5;
+  streamGain = actx.createGain();
+  streamGain.gain.value = 0;
+  strmSrc.connect(strmFilt);
+  strmFilt.connect(streamGain);
+  streamGain.connect(actx.destination);
+  strmSrc.start();
+
+  // Start birds/crickets
+  scheduleChirp();
+}
+
+function scheduleChirp() {
+  if (!actx) return;
+  var elapsed = clk ? clk.getElapsedTime() : 0;
+  var phase = (elapsed % CYCLE) / CYCLE;
+  var sunH = Math.sin(phase * Math.PI * 2);
+
+  if (sunH > -0.1) {
+    // Day: bird chirp
+    chirp(1800 + Math.random() * 2500, 0.025);
+  } else {
+    // Night: cricket
+    chirp(4500 + Math.random() * 2500, 0.015);
+  }
+  setTimeout(scheduleChirp, 8000 + Math.random() * 15000);
+}
+
+function chirp(freq, vol) {
+  if (!actx) return;
+  var now = actx.currentTime;
+  for (var n = 0; n < 2 + Math.floor(Math.random() * 2); n++) {
+    var osc = actx.createOscillator();
+    var gain = actx.createGain();
+    osc.frequency.value = freq * (1 + n * 0.25 + Math.random() * 0.1);
+    osc.type = 'sine';
+    var start = now + n * (0.1 + Math.random() * 0.08);
+    var dur = 0.08 + Math.random() * 0.12;
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(vol, start + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+    osc.connect(gain);
+    gain.connect(actx.destination);
+    osc.start(start);
+    osc.stop(start + dur + 0.01);
+  }
+}
+
+function updateAudio() {
+  if (!audioOn) return;
+  // Stream volume by distance
+  var sd = ((px - STR_X) % W + W) % W;
+  if (sd > HW) sd = W - sd;
+  var vol = Math.max(0, 1 - sd / 25) * 0.15;
+  streamGain.gain.setTargetAtTime(vol, actx.currentTime, 0.1);
+}
+
+// ===================== CONTROLS =====================
+function setupControls() {
+  // Keyboard
+  document.addEventListener('keydown', function(e) {
+    keys[e.code] = true;
+    if (e.code === 'Escape') {
+      var ci = document.getElementById('chat-in');
+      if (document.activeElement === ci) ci.blur();
+    }
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (inMaze && mazeExitReady && Math.sqrt((mpx-2)*(mpx-2) + (mpz-2)*(mpz-2)) < 3) {
+        transitionToOutdoor();
+      } else if (!inMaze && pDist(px, pz, 0, 0) < 2.5) {
+        transitionToMaze();
+      }
+    }
+  });
+  document.addEventListener('keyup', function(e) { keys[e.code] = false; });
+
+  // Pointer lock (desktop)
+  ren.domElement.addEventListener('click', function() {
+    if (!('ontouchstart' in window) && !pLocked) {
+      ren.domElement.requestPointerLock();
+    }
+  });
+  document.addEventListener('pointerlockchange', function() {
+    pLocked = (document.pointerLockElement === ren.domElement);
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (pLocked) {
+      yaw -= e.movementX * 0.002;
+    }
+  });
+
+  // Mouse click interaction (desktop)
+  document.addEventListener('click', function() {
+    if (pLocked) tryInteract();
+    if (!audioOn) initAudio();
+  });
+
+  // Touch
+  ren.domElement.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    var t = e.touches[0];
+    tch.on = true;
+    tch.sx = tch.cx = t.clientX;
+    tch.sy = tch.cy = t.clientY;
+    tch.t0 = Date.now();
+    if (!audioOn) initAudio();
+    if (!hintShown) {
+      hintShown = true;
+      hintEl.style.opacity = '0';
+    }
+  }, { passive: false });
+
+  ren.domElement.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    var t = e.touches[0];
+    tch.cx = t.clientX;
+    tch.cy = t.clientY;
+  }, { passive: false });
+
+  ren.domElement.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    var dt = Date.now() - tch.t0;
+    var dx = Math.abs(tch.cx - tch.sx);
+    var dy = Math.abs(tch.cy - tch.sy);
+    if (dt < 300 && dx < 15 && dy < 15) {
+      tryInteract();
+    }
+    tch.on = false;
+  }, { passive: false });
+
+  // Chat input
+  var chatIn = document.getElementById('chat-in');
+  var chatBtn = document.getElementById('chat-send');
+  chatIn.addEventListener('keydown', function(e) {
+    var moveKeys = ['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Escape'];
+    if (moveKeys.indexOf(e.code) === -1) e.stopPropagation();
+    if (e.key === 'Enter') { sendChat(chatIn.value); chatIn.value = ''; }
+    if (e.code === 'Escape') { chatIn.blur(); }
+  });
+  chatIn.addEventListener('keyup', function(e) {
+    var moveKeys = ['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Escape'];
+    if (moveKeys.indexOf(e.code) === -1) e.stopPropagation();
+  });
+  chatBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    sendChat(chatIn.value);
+    chatIn.value = '';
+    chatIn.focus();
+  });
+
+  // Resize
+  window.addEventListener('resize', function() {
+    cam.aspect = window.innerWidth / window.innerHeight;
+    cam.updateProjectionMatrix();
+    ren.setSize(window.innerWidth, window.innerHeight);
+  });
+}
+
+// ===================== PLAYER UPDATE =====================
+function updatePlayer(dt) {
+  var moveF = 0, moveR = 0;
+  var inputFocused = document.activeElement === document.getElementById('chat-in');
+
+  // Keyboard (skip if typing in chat)
+  if (!inputFocused) {
+    if (keys['KeyW'] || keys['ArrowUp']) moveF += 1;
+    if (keys['KeyS'] || keys['ArrowDown']) moveF -= 1;
+    if (keys['KeyA'] || keys['ArrowLeft']) moveR -= 1;
+    if (keys['KeyD'] || keys['ArrowRight']) moveR += 1;
+  }
+
+  // Touch
+  if (tch.on) {
+    moveF = 1;
+    var tdx = (tch.cx - tch.sx) / window.innerWidth;
+    yaw -= tdx * 3.0 * dt;
+  }
+
+  // Apply movement with house collision (axis-independent for wall sliding)
+  var sinY = Math.sin(yaw), cosY = Math.cos(yaw);
+  var nx = px + (-sinY * moveF + cosY * moveR) * SPD * dt;
+  var nz = pz + (-cosY * moveF - sinY * moveR) * SPD * dt;
+
+  if (!houseCollide(nx, pz)) px = nx;
+  if (!houseCollide(px, nz)) pz = nz;
+
+  // PBC wrapping
+  if (px > HW) px -= W;
+  if (px < -HW) px += W;
+  if (pz > HW) pz -= W;
+  if (pz < -HW) pz += W;
+
+  // Camera
+  var gy = groundH(px, pz);
+  var bobAmt = (moveF !== 0 || moveR !== 0) ? 1 : 0;
+  var bob = Math.sin(clk.getElapsedTime() * 7) * 0.025 * bobAmt;
+  cam.position.set(px, gy + EYE + bob, pz);
+  cam.rotation.order = 'YXZ';
+  cam.rotation.y = yaw;
+  cam.rotation.x = 0;
+
+  // Entrance hint
+  if (pDist(px, pz, 0, 0) < 2.5) {
+    mazeHintEl.textContent = 'ontouchstart' in window ? '轻点进入' : '按空格进入迷宫';
+    mazeHintEl.style.opacity = '1';
+  } else {
+    if (mazeHintEl) mazeHintEl.style.opacity = '0';
+  }
+}
+
+// ===================== INTERACTION =====================
+function tryInteract() {
+  // Maze entrance (outdoor)
+  if (!inMaze && pDist(px, pz, 0, 0) < 2.5) {
+    transitionToMaze();
+    return;
+  }
+  // Maze exit (inside maze)
+  if (inMaze && mazeExitReady && Math.sqrt((mpx-2)*(mpx-2) + (mpz-2)*(mpz-2)) < 3) {
+    transitionToOutdoor();
+    return;
+  }
+  // Book
+  if (bookPos && pDist(px, pz, bookPos.x, bookPos.z) < 2.5) {
+    showMsg('我们度过的，都只是时间之外的往事。\n\n—— 《时间之外的往事》');
+    return;
+  }
+  // Tombstone ring — focus chat input
+  if (tombPos && pDist(px, pz, tombPos.x, tombPos.z) < 5) {
+    document.getElementById('chat-in').focus();
+    return;
+  }
+}
+
+function showMsg(text) {
+  var el = document.getElementById('text');
+  el.innerHTML = text.replace(/\n/g, '<br>');
+  el.style.opacity = '1';
+  clearTimeout(txtTimer);
+  txtTimer = setTimeout(function() { el.style.opacity = '0'; }, 6000);
+}
+
+// ===================== TOMBSTONE CHAT (Ollama) =====================
+function updateChat() {
+  if (!tombPos) return;
+  var dist = pDist(px, pz, tombPos.x, tombPos.z);
+  var chatEl = document.getElementById('chat');
+  if (dist < 5) {
+    chatEl.classList.add('active');
+    if (!tombChatInited) {
+      tombChatInited = true;
+      var msgsEl = document.getElementById('chat-msgs');
+      var div = document.createElement('div');
+      div.className = 'chat-msg ai';
+      div.innerHTML = '647号宇宙<br><br>把你们拿走的质量归还吧，只把记忆送往新宇宙。';
+      msgsEl.appendChild(div);
+    }
+  } else {
+    chatEl.classList.remove('active');
+    var ci = document.getElementById('chat-in');
+    if (document.activeElement === ci) ci.blur();
+  }
+}
+
+function sendChat(msg) {
+  msg = msg.trim();
+  if (!msg) return;
+  var msgsEl = document.getElementById('chat-msgs');
+
+  // User message
+  var uDiv = document.createElement('div');
+  uDiv.className = 'chat-msg user';
+  uDiv.textContent = msg;
+  msgsEl.appendChild(uDiv);
+
+  // AI placeholder
+  var aDiv = document.createElement('div');
+  aDiv.className = 'chat-msg ai';
+  aDiv.textContent = '…';
+  msgsEl.appendChild(aDiv);
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+
+  fetch('http://localhost:11434/api/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'phi3:mini',
+      prompt: msg,
+      system: '你是一块墓碑。当被问到"你是谁"时，回答"我是墓碑"。你只讨论两类话题：（1）刘慈欣《三体》三部曲（《三体》《黑暗森林》《死神永生》）相关的一切——人物、事件、概念、哲学；（2）科学探究与科学本质相关的话题——科学方法、观测与实验、因果与规律、已知与未知的边界。除此之外的任何话题，你只回复"..."，绝不加任何解释或额外文字。回答简短（不超过三句话），语气沉静。用中文回答。',
+      stream: false
+    })
+  }).then(function(res) { return res.json(); })
+    .then(function(data) {
+      var resp = (data.response || '...').trim();
+      // phi3:mini often hallucinates junk after the real answer — strip it
+      // Cut at first occurrence of common junk patterns
+      var junk = ['--','——','指令','扮演','限制','角色','（更','(更','[更','System','system','<|'];
+      for (var ji = 0; ji < junk.length; ji++) {
+        var idx = resp.indexOf(junk[ji]);
+        if (idx > 0) resp = resp.substring(0, idx).trim();
+      }
+      // Also cap at ~150 chars to prevent runaway output
+      if (resp.length > 150) {
+        var lastPunct = Math.max(resp.lastIndexOf('。', 150), resp.lastIndexOf('，', 150), resp.lastIndexOf('.', 150));
+        resp = lastPunct > 20 ? resp.substring(0, lastPunct + 1) : resp.substring(0, 150);
+      }
+      aDiv.textContent = resp || '...';
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+    }).catch(function() {
+      aDiv.textContent = '...（连接中断）';
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+    });
+}
+
+// ===================== MAZE GENERATION =====================
+function mazeRand() {
+  mazeSeed = (mazeSeed * 1664525 + 1013904223) & 0x7FFFFFFF;
+  return mazeSeed / 0x7FFFFFFF;
+}
+
+function removeWall(r, c, dir) {
+  if (dir === 0) mazeH[(r - 1 + MROWS) % MROWS][c] = false;
+  else if (dir === 1) mazeH[r][c] = false;
+  else if (dir === 2) mazeV[r][c] = false;
+  else mazeV[r][(c - 1 + MCOLS) % MCOLS] = false;
+}
+
+function generateMaze() {
+  mazeSeed = 647;
+  var r, c;
+  for (r = 0; r < MROWS; r++) {
+    mazeH[r] = []; mazeV[r] = [];
+    for (c = 0; c < MCOLS; c++) { mazeH[r][c] = true; mazeV[r][c] = true; }
+  }
+  var visited = [];
+  for (r = 0; r < MROWS; r++) {
+    visited[r] = [];
+    for (c = 0; c < MCOLS; c++) visited[r][c] = false;
+  }
+  var dirs = [{ dr: -1, dc: 0 }, { dr: 1, dc: 0 }, { dr: 0, dc: 1 }, { dr: 0, dc: -1 }];
+  var stack = [{ r: 0, c: 0, lastDir: -1 }];
+  visited[0][0] = true;
+  while (stack.length > 0) {
+    var cur = stack[stack.length - 1];
+    var neighbors = [];
+    for (var d = 0; d < 4; d++) {
+      var nr = (cur.r + dirs[d].dr + MROWS) % MROWS;
+      var nc = (cur.c + dirs[d].dc + MCOLS) % MCOLS;
+      if (!visited[nr][nc]) neighbors.push({ d: d, r: nr, c: nc });
+    }
+    if (neighbors.length === 0) { stack.pop(); continue; }
+    var sameDir = neighbors.filter(function(n) { return n.d === cur.lastDir; });
+    var chosen;
+    if (sameDir.length > 0 && mazeRand() < 0.7) {
+      chosen = sameDir[0];
+    } else {
+      chosen = neighbors[Math.floor(mazeRand() * neighbors.length)];
+    }
+    removeWall(cur.r, cur.c, chosen.d);
+    visited[chosen.r][chosen.c] = true;
+    stack.push({ r: chosen.r, c: chosen.c, lastDir: chosen.d });
+  }
+  // Post-process: remove ~12% of walls for open areas
+  for (r = 0; r < MROWS; r++) {
+    for (c = 0; c < MCOLS; c++) {
+      if (mazeH[r][c] && mazeRand() < 0.12) mazeH[r][c] = false;
+      if (mazeV[r][c] && mazeRand() < 0.12) mazeV[r][c] = false;
+    }
+  }
+}
+
+// ===================== MAZE GEOMETRY =====================
+function buildMazeGeometry() {
+  var positions = [], norms = [], indices = [];
+  var vc = 0;
+  var wallW = 0.15;
+  var offsets = [
+    [0,0],[MSIZE,0],[-MSIZE,0],[0,MSIZE],[0,-MSIZE],
+    [MSIZE,MSIZE],[-MSIZE,MSIZE],[MSIZE,-MSIZE],[-MSIZE,-MSIZE]
+  ];
+
+  function addQuad(x0,y0,z0, x1,y1,z1, x2,y2,z2, x3,y3,z3, nx,ny,nz) {
+    positions.push(x0,y0,z0, x1,y1,z1, x2,y2,z2, x3,y3,z3);
+    norms.push(nx,ny,nz, nx,ny,nz, nx,ny,nz, nx,ny,nz);
+    indices.push(vc,vc+1,vc+2, vc,vc+2,vc+3);
+    vc += 4;
+  }
+
+  for (var ti = 0; ti < offsets.length; ti++) {
+    var ox = offsets[ti][0], oz = offsets[ti][1];
+    for (var r = 0; r < MROWS; r++) {
+      for (var c = 0; c < MCOLS; c++) {
+        // Horizontal wall (south side of cell)
+        if (mazeH[r][c]) {
+          var hx0 = c * MCELL - MHALF + ox;
+          var hx1 = (c + 1) * MCELL - MHALF + ox;
+          var hz = (r + 1) * MCELL - MHALF + oz;
+          var y0 = MAZE_Y, y1 = MAZE_Y + MAZE_WALL_H;
+          addQuad(hx0,y0,hz-wallW/2, hx1,y0,hz-wallW/2, hx1,y1,hz-wallW/2, hx0,y1,hz-wallW/2, 0,0,-1);
+          addQuad(hx1,y0,hz+wallW/2, hx0,y0,hz+wallW/2, hx0,y1,hz+wallW/2, hx1,y1,hz+wallW/2, 0,0,1);
+        }
+        // Vertical wall (east side of cell)
+        if (mazeV[r][c]) {
+          var vx = (c + 1) * MCELL - MHALF + ox;
+          var vz0 = r * MCELL - MHALF + oz;
+          var vz1 = (r + 1) * MCELL - MHALF + oz;
+          var vy0 = MAZE_Y, vy1 = MAZE_Y + MAZE_WALL_H;
+          addQuad(vx-wallW/2,vy0,vz1, vx-wallW/2,vy0,vz0, vx-wallW/2,vy1,vz0, vx-wallW/2,vy1,vz1, -1,0,0);
+          addQuad(vx+wallW/2,vy0,vz0, vx+wallW/2,vy0,vz1, vx+wallW/2,vy1,vz1, vx+wallW/2,vy1,vz0, 1,0,0);
+        }
+      }
+    }
+  }
+
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(norms, 3));
+  geo.setIndex(indices);
+  mazeMesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0xA09870 }));
+  scene.add(mazeMesh);
+
+  // Floor (large enough for PBC)
+  var floorGeo = new THREE.PlaneGeometry(200, 200, 20, 20);
+  floorGeo.rotateX(-Math.PI / 2);
+  var fc = new Float32Array(floorGeo.attributes.position.count * 3);
+  for (var i = 0; i < fc.length; i += 3) {
+    var s = 0.92 + Math.random() * 0.08;
+    fc[i] = 0.50 * s; fc[i+1] = 0.44 * s; fc[i+2] = 0.31 * s;
+  }
+  floorGeo.setAttribute('color', new THREE.BufferAttribute(fc, 3));
+  mazeFloor = new THREE.Mesh(floorGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  mazeFloor.position.y = MAZE_Y;
+  scene.add(mazeFloor);
+
+  // Ceiling
+  var ceilGeo = new THREE.PlaneGeometry(200, 200);
+  ceilGeo.rotateX(Math.PI / 2);
+  mazeCeiling = new THREE.Mesh(ceilGeo, new THREE.MeshLambertMaterial({ color: 0x908868 }));
+  mazeCeiling.position.y = MAZE_Y + MAZE_WALL_H;
+  scene.add(mazeCeiling);
+}
+
+// ===================== MAZE LIGHTS =====================
+function createMazeLights() {
+  // Player-following light (starts off)
+  mazePlayerLight = new THREE.PointLight(0xFFEECC, 0, 15);
+  mazePlayerLight.position.set(0, MAZE_Y + MAZE_WALL_H - 0.3, 0);
+  scene.add(mazePlayerLight);
+
+  // Fixed lights at intersections (every 3 cells)
+  for (var r = 1; r < MROWS; r += 3) {
+    for (var c = 1; c < MCOLS; c += 3) {
+      var lx = (c + 0.5) * MCELL - MHALF;
+      var lz = (r + 0.5) * MCELL - MHALF;
+      var fl = new THREE.PointLight(0xFFEECC, 0, 12);
+      fl.position.set(lx, MAZE_Y + MAZE_WALL_H - 0.3, lz);
+      fl.userData.baseIntensity = 0.3;
+      fl.userData.offset = Math.random() * 100;
+      scene.add(fl);
+      mazeLights.push(fl);
+    }
+  }
+
+  // Fluorescent panels on ceiling (InstancedMesh)
+  var panelGeo = new THREE.PlaneGeometry(1.2, 0.3);
+  panelGeo.rotateX(Math.PI / 2);
+  var panelMat = new THREE.MeshBasicMaterial({ color: 0xEEDDCC });
+  mazePanels = new THREE.InstancedMesh(panelGeo, panelMat, mazeLights.length);
+  var pd = new THREE.Object3D();
+  for (var i = 0; i < mazeLights.length; i++) {
+    pd.position.copy(mazeLights[i].position);
+    pd.position.y = MAZE_Y + MAZE_WALL_H - 0.01;
+    pd.updateMatrix();
+    mazePanels.setMatrixAt(i, pd.matrix);
+  }
+  mazePanels.instanceMatrix.needsUpdate = true;
+  scene.add(mazePanels);
+
+  // Entrance/exit marker on floor
+  var markerGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.02, 12);
+  var markerMat = new THREE.MeshBasicMaterial({ color: 0x557755 });
+  var marker = new THREE.Mesh(markerGeo, markerMat);
+  marker.position.set(2, MAZE_Y + 0.02, 2);
+  scene.add(marker);
+}
+
+// ===================== MAZE ENTRANCE (OUTDOOR) =====================
+function createEntrance() {
+  var ey = tH(0, 0);
+  var pillarGeo = new THREE.CylinderGeometry(0.12, 0.18, 2, 6);
+  var stoneMat = new THREE.MeshLambertMaterial({ color: 0x707070 });
+  var corners = [[-1.3,-1.3],[1.3,-1.3],[-1.3,1.3],[1.3,1.3]];
+  for (var i = 0; i < 4; i++) {
+    var p = new THREE.Mesh(pillarGeo, stoneMat);
+    p.position.set(corners[i][0], ey + 1, corners[i][1]);
+    scene.add(p);
+  }
+  // Platform
+  var platGeo = new THREE.BoxGeometry(3, 0.15, 3);
+  var plat = new THREE.Mesh(platGeo, stoneMat);
+  plat.position.set(0, ey - 0.08, 0);
+  scene.add(plat);
+  // Dark opening
+  var openGeo = new THREE.PlaneGeometry(2.2, 2.2);
+  openGeo.rotateX(-Math.PI / 2);
+  var opening = new THREE.Mesh(openGeo, new THREE.MeshBasicMaterial({ color: 0x0a0a0a }));
+  opening.position.set(0, ey + 0.01, 0);
+  scene.add(opening);
+  // Warm glow
+  var eLight = new THREE.PointLight(0xCCAA66, 0.4, 8);
+  eLight.position.set(0, ey - 0.5, 0);
+  scene.add(eLight);
+}
+
+// ===================== MAZE COLLISION =====================
+function mazeCollide(x, z) {
+  var pad = 0.35;
+  var lx = ((x + MHALF) % MSIZE + MSIZE) % MSIZE;
+  var lz = ((z + MHALF) % MSIZE + MSIZE) % MSIZE;
+  var col = Math.floor(lx / MCELL);
+  var row = Math.floor(lz / MCELL);
+  var cx = lx - col * MCELL;
+  var cz = lz - row * MCELL;
+  if (mazeH[row][col] && cz > MCELL - pad) return true;
+  if (mazeH[(row - 1 + MROWS) % MROWS][col] && cz < pad) return true;
+  if (mazeV[row][col] && cx > MCELL - pad) return true;
+  if (mazeV[row][(col - 1 + MCOLS) % MCOLS] && cx < pad) return true;
+  return false;
+}
+
+// ===================== MAZE PLAYER =====================
+function updatePlayerMaze(dt) {
+  var moveF = 0, moveR = 0;
+  var inputFocused = document.activeElement === document.getElementById('chat-in');
+  if (!inputFocused) {
+    if (keys['KeyW'] || keys['ArrowUp']) moveF += 1;
+    if (keys['KeyS'] || keys['ArrowDown']) moveF -= 1;
+    if (keys['KeyA'] || keys['ArrowLeft']) moveR -= 1;
+    if (keys['KeyD'] || keys['ArrowRight']) moveR += 1;
+  }
+  if (tch.on) {
+    moveF = 1;
+    var tdx = (tch.cx - tch.sx) / window.innerWidth;
+    yaw -= tdx * 3.0 * dt;
+  }
+  var sinY = Math.sin(yaw), cosY = Math.cos(yaw);
+  var nx = mpx + (-sinY * moveF + cosY * moveR) * SPD * dt;
+  var nz = mpz + (-cosY * moveF - sinY * moveR) * SPD * dt;
+  if (!mazeCollide(nx, mpz)) mpx = nx;
+  if (!mazeCollide(mpx, nz)) mpz = nz;
+  if (mpx > MHALF) mpx -= MSIZE;
+  if (mpx < -MHALF) mpx += MSIZE;
+  if (mpz > MHALF) mpz -= MSIZE;
+  if (mpz < -MHALF) mpz += MSIZE;
+  if (!mazeExitReady && Math.sqrt((mpx-2)*(mpx-2) + (mpz-2)*(mpz-2)) > 8) mazeExitReady = true;
+  var bobAmt = (moveF !== 0 || moveR !== 0) ? 1 : 0;
+  var bob = Math.sin(clk.getElapsedTime() * 7) * 0.025 * bobAmt;
+  cam.position.set(mpx, MAZE_Y + EYE + bob, mpz);
+  cam.rotation.order = 'YXZ';
+  cam.rotation.y = yaw;
+  cam.rotation.x = 0;
+  mazePlayerLight.position.set(mpx, MAZE_Y + MAZE_WALL_H - 0.3, mpz);
+  // Exit hint
+  var exitDist = Math.sqrt((mpx-2)*(mpx-2) + (mpz-2)*(mpz-2));
+  if (mazeExitReady && exitDist < 3) {
+    mazeHintEl.textContent = 'ontouchstart' in window ? '轻点离开' : '按空格离开迷宫';
+    mazeHintEl.style.opacity = '1';
+  } else {
+    mazeHintEl.style.opacity = '0';
+  }
+}
+
+// ===================== MAZE TRANSITIONS =====================
+function transitionToMaze() {
+  if (inMaze) return;
+  fadeEl.style.opacity = '1';
+  setTimeout(function() {
+    savedOutdoorPos.x = px;
+    savedOutdoorPos.z = pz;
+    savedOutdoorPos.yaw = yaw;
+    inMaze = true;
+    mazeExitReady = false;
+    mpx = 2; mpz = 2; // center of cell (8,8) containing world origin
+    scene.fog.near = 0.1;
+    scene.fog.far = 18;
+    scene.fog.color.set(0x999966);
+    ren.setClearColor(0x999966);
+    sunLight.intensity = 0;
+    sunMesh.visible = false;
+    moonMesh.visible = false;
+    ambLight.color.set(0xCCBB88);
+    ambLight.intensity = 0.5;
+    mazePlayerLight.intensity = 0.6;
+    for (var i = 0; i < mazeLights.length; i++) {
+      mazeLights[i].intensity = mazeLights[i].userData.baseIntensity;
+    }
+    if (audioOn) {
+      windGain.gain.setTargetAtTime(0, actx.currentTime, 0.1);
+      streamGain.gain.setTargetAtTime(0, actx.currentTime, 0.1);
+    }
+    initMazeAudio();
+    cam.position.set(2, MAZE_Y + EYE, 2);
+    document.getElementById('text').style.opacity = '0';
+    mazeHintEl.style.opacity = '0';
+    setTimeout(function() { fadeEl.style.opacity = '0'; }, 150);
+  }, 500);
+}
+
+function transitionToOutdoor() {
+  if (!inMaze) return;
+  fadeEl.style.opacity = '1';
+  setTimeout(function() {
+    inMaze = false;
+    px = savedOutdoorPos.x;
+    pz = savedOutdoorPos.z;
+    yaw = savedOutdoorPos.yaw;
+    scene.fog.near = FOG_NEAR;
+    scene.fog.far = FOG_FAR;
+    mazePlayerLight.intensity = 0;
+    for (var i = 0; i < mazeLights.length; i++) mazeLights[i].intensity = 0;
+    if (audioOn) {
+      windGain.gain.setTargetAtTime(0.07, actx.currentTime, 0.3);
+    }
+    stopMazeAudio();
+    var gy = groundH(px, pz);
+    cam.position.set(px, gy + EYE, pz);
+    mazeHintEl.style.opacity = '0';
+    setTimeout(function() { fadeEl.style.opacity = '0'; }, 150);
+  }, 500);
+}
+
+// ===================== MAZE AUDIO =====================
+function initMazeAudio() {
+  if (!audioOn) return;
+  var hum60 = actx.createOscillator();
+  hum60.frequency.value = 60; hum60.type = 'sine';
+  var g60 = actx.createGain(); g60.gain.value = 0.015;
+  hum60.connect(g60); g60.connect(actx.destination); hum60.start();
+  var hum120 = actx.createOscillator();
+  hum120.frequency.value = 120; hum120.type = 'sine';
+  var g120 = actx.createGain(); g120.gain.value = 0.008;
+  hum120.connect(g120); g120.connect(actx.destination); hum120.start();
+  mazeHumNodes = [{ osc: hum60, gain: g60 }, { osc: hum120, gain: g120 }];
+  scheduleDrip();
+}
+
+function stopMazeAudio() {
+  for (var i = 0; i < mazeHumNodes.length; i++) {
+    try { mazeHumNodes[i].osc.stop(); } catch(e) {}
+  }
+  mazeHumNodes = [];
+}
+
+function scheduleDrip() {
+  if (!inMaze || !audioOn) return;
+  var now = actx.currentTime;
+  var osc = actx.createOscillator();
+  var gain = actx.createGain();
+  osc.frequency.value = 200 + Math.random() * 300;
+  osc.type = 'sine';
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.025, now + 0.005);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+  osc.connect(gain); gain.connect(actx.destination);
+  osc.start(now); osc.stop(now + 0.3);
+  setTimeout(scheduleDrip, 4000 + Math.random() * 8000);
+}
+
+// ===================== MAZE UPDATE =====================
+function updateMaze(t) {
+  for (var i = 0; i < mazeLights.length; i++) {
+    var fl = mazeLights[i];
+    fl.intensity = fl.userData.baseIntensity
+      + Math.sin(t * 30 + fl.userData.offset) * 0.025
+      + Math.sin(t * 7 + fl.userData.offset * 2) * 0.015;
+  }
+}
+
+// ===================== INIT =====================
+function init() {
+  // Scene
+  scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0xc9a060, FOG_NEAR, FOG_FAR);
+
+  // Camera
+  cam = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 250);
+
+  // Renderer
+  ren = new THREE.WebGLRenderer({ antialias: false });
+  ren.setSize(window.innerWidth, window.innerHeight);
+  ren.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  ren.setClearColor(0xc9a060);
+  document.body.appendChild(ren.domElement);
+
+  // Clock
+  clk = new THREE.Clock();
+
+  // Build world
+  createTerrain();
+  createSky();
+  createStars();
+  createCelestial();
+  setupLights();
+  createWheat();
+  createTrees();
+  createStream();
+  createHouse();
+  createTombstone();
+  createEntrance();
+
+  // Maze
+  generateMaze();
+  buildMazeGeometry();
+  createMazeLights();
+
+  // Controls
+  setupControls();
+  fadeEl = document.getElementById('fade');
+  mazeHintEl = document.getElementById('maze-hint');
+
+  // Hint
+  hintEl = document.getElementById('hint');
+  setTimeout(function() {
+    document.getElementById('title').style.display = 'none';
+    if (!hintShown) {
+      var isMobile = 'ontouchstart' in window;
+      hintEl.textContent = isMobile ? '触摸屏幕开始漫步' : '点击进入，WASD移动，鼠标转向';
+      hintEl.style.opacity = '1';
+      setTimeout(function() { hintEl.style.opacity = '0'; hintShown = true; }, 5000);
+    }
+  }, 4500);
+
+  // Start loop
+  animate();
+}
+
+// ===================== MAIN LOOP =====================
+function animate() {
+  requestAnimationFrame(animate);
+
+  var dt = Math.min(clk.getDelta(), 0.1);
+  var t = clk.getElapsedTime();
+
+  if (inMaze) {
+    updatePlayerMaze(dt);
+    updateMaze(t);
+  } else {
+    updatePlayer(dt);
+    updateDayNight(t);
+    updateWheat(t);
+    updateWater(t);
+    updateAudio();
+    updateTombstone(t);
+    updateChat();
+  }
+
+  ren.render(scene, cam);
+}
+
+// GO
+init();
+
+})();
+</script>
+</body>
+</html>

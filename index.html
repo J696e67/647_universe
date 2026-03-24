@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>神农堂 — 647号宇宙</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- UI Overlays -->
+<div id="title">647号宇宙</div>
+<div id="subtitle"></div>
+<div id="char-name"></div>
+<div id="text"></div>
+<div id="hint"></div>
+<div id="fade"></div>
+<div id="maze-hint"></div>
+<div id="crosshair">+</div>
+
+<!-- Action Menu -->
+<div id="action-menu"></div>
+
+<!-- Notebook Button -->
+<div id="notebook-btn">📖</div>
+
+<!-- Notebook Overlay -->
+<div id="notebook-overlay">
+  <div id="notebook-header">
+    <span id="notebook-title">Notebook</span>
+    <div id="notebook-filters"></div>
+    <button id="notebook-close">&times;</button>
+  </div>
+  <div id="notebook-content"></div>
+</div>
+
+<!-- Death Screen -->
+<div id="death-screen">
+  <div id="death-msg"></div>
+  <div id="death-new"></div>
+</div>
+
+<!-- Tombstone Chat -->
+<div id="chat">
+  <div id="chat-msgs"></div>
+  <div id="chat-input-wrap">
+    <input id="chat-in" type="text" placeholder="与墓碑对话..." autocomplete="off">
+    <button id="chat-send">&rarr;</button>
+  </div>
+</div>
+
+<!-- Leaderboard -->
+<div id="leaderboard-overlay">
+  <div id="leaderboard-header">
+    <span>神农堂榜单</span>
+    <button id="leaderboard-close">&times;</button>
+  </div>
+  <div id="leaderboard-content"></div>
+</div>
+
+<!-- Loading Screen -->
+<div id="loading">
+  <div id="loading-title">神农堂</div>
+  <div id="loading-sub">Shennong Hall</div>
+  <div id="loading-tag">Play until you die. Play until you know why.</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/main.js"></script>
+<script src="js/sky.js"></script>
+<script src="js/world.js"></script>
+<script src="js/player.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/maze.js"></script>
+<script src="js/rooms.js"></script>
+<script src="js/substances.js"></script>
+<script src="js/surfaces.js"></script>
+<script src="js/senses.js"></script>
+<script src="js/effects.js"></script>
+<script src="js/notebook.js"></script>
+<script src="js/characters.js"></script>
+<script src="js/tombstone.js"></script>
+<script src="js/equipment.js"></script>
+<script src="js/leaderboard.js"></script>
+<script>G.start();</script>
+</body>
+</html>

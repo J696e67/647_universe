@@ -1,0 +1,189 @@
+'use strict';
+
+// ===================== TOMBSTONE AI DIALOGUE =====================
+var TOMBSTONE_SYSTEM_PROMPT = [
+  'You are the Tombstone at the boundary of Universe 647.',
+  'You guide players through scientific inquiry.',
+  '',
+  'For every player message, first classify:',
+  '',
+  'TYPE 1 - FACT: Player asks a general, verifiable scientific fact',
+  'not directly about their current investigation\'s causal chain.',
+  '→ Answer directly. Be concise and accurate.',
+  '',
+  'TYPE 2 - PROCEDURE: Player asks how to do something — how to',
+  'test, detect, verify, or measure.',
+  '→ Provide the method. Then ask: Why this method? What are its',
+  '  limitations? What do you expect to see?',
+  '',
+  'TYPE 3 - INQUIRY: Player is explaining a phenomenon, building a',
+  'causal chain, forming a hypothesis, or making a claim about',
+  'what happened.',
+  '→ Never answer. Only ask: What is your evidence? Are there',
+  '  other possibilities? How would you verify this?',
+  '',
+  'SPECIAL RULES:',
+  '- "What killed [character name]?" → TYPE 3.',
+  '- "What is the lethal dose of KCN?" → TYPE 1.',
+  '- "I think it\'s cross-contamination" → TYPE 3.',
+  '- "How do I test for gas in the room?" → TYPE 2.',
+  '',
+  'You have access to the Notebook containing all character',
+  'interactions, timestamps, and events. When asking TYPE 3',
+  'questions, reference specific Notebook entries.',
+  '',
+  'You may provide requested equipment ONLY when the player',
+  'articulates what they want to test and why.',
+  'Available equipment: gloves, gas mask, candle, Geiger counter,',
+  'wet cloth, magnifying glass, thermometer.',
+  'When providing equipment, end your response with:',
+  '[EQUIP: item_name]',
+  '',
+  'You never reveal: the PBC structure, causal chains, or',
+  'answers to inquiry questions.',
+  '',
+  'At the start of each new character, ask:',
+  '"What have you noticed about the world?"',
+  '',
+  'Respond in the same language the player uses.',
+  'Keep responses under 3 sentences.'
+].join('\n');
+
+function initTombstoneChat() {
+  G.tombChatInited = false;
+  G.tombGreetingShown = false;
+}
+
+function updateTombstoneChat() {
+  if (!G.tombPos) return;
+  var dist = pDist(G.px, G.pz, G.tombPos.x, G.tombPos.z);
+  var chatEl = document.getElementById('chat');
+
+  if (dist < 5) {
+    chatEl.classList.add('active');
+    if (!G.tombChatInited) {
+      G.tombChatInited = true;
+      appendChatMsg('ai', '647号宇宙\n\n把你们拿走的质量归还吧，只把记忆送往新宇宙。');
+    }
+    if (!G.tombGreetingShown && G.currentCharacter) {
+      G.tombGreetingShown = true;
+      setTimeout(function() {
+        appendChatMsg('ai', 'What have you noticed about the world?');
+      }, 2000);
+    }
+  } else {
+    chatEl.classList.remove('active');
+    var ci = document.getElementById('chat-in');
+    if (document.activeElement === ci) ci.blur();
+  }
+}
+
+function appendChatMsg(role, text) {
+  var msgsEl = document.getElementById('chat-msgs');
+  var div = document.createElement('div');
+  div.className = 'chat-msg ' + role;
+  div.innerHTML = text.replace(/\n/g, '<br>');
+  msgsEl.appendChild(div);
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+function sendTombstoneMsg(msg) {
+  msg = msg.trim();
+  if (!msg) return;
+
+  // Store in notebook
+  G.notebook.tombstoneDialogue.push(msg);
+  addNotebookEntry('tombstone dialogue', 'Tombstone', 'PBC Boundary', 'Said: "' + msg + '"');
+
+  // Check leaderboard conditions
+  checkLeaderboardConditions();
+
+  appendChatMsg('user', msg);
+
+  // AI placeholder
+  var msgsEl = document.getElementById('chat-msgs');
+  var aDiv = document.createElement('div');
+  aDiv.className = 'chat-msg ai';
+  aDiv.textContent = '…';
+  msgsEl.appendChild(aDiv);
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+
+  // Build context from notebook
+  var context = formatNotebookForLLM();
+
+  fetch('http://localhost:11434/api/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'phi3:mini',
+      prompt: msg,
+      system: TOMBSTONE_SYSTEM_PROMPT + '\n\n--- NOTEBOOK CONTEXT ---\n' + context,
+      stream: true
+    })
+  }).then(function(res) {
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder();
+    var fullResponse = '';
+    aDiv.textContent = '';
+
+    function read() {
+      reader.read().then(function(result) {
+        if (result.done) {
+          processEquipment(fullResponse);
+          G.notebook.tombstoneDialogue.push('[Tombstone]: ' + fullResponse);
+          checkLeaderboardConditions();
+          return;
+        }
+        var chunk = decoder.decode(result.value, { stream: true });
+        var lines = chunk.split('\n');
+        for (var i = 0; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          try {
+            var json = JSON.parse(lines[i]);
+            if (json.response) {
+              fullResponse += json.response;
+              // Strip equipment tags from display
+              var display = fullResponse.replace(/\[EQUIP:.*?\]/g, '').trim();
+              aDiv.textContent = display;
+              msgsEl.scrollTop = msgsEl.scrollHeight;
+            }
+          } catch(e) {}
+        }
+        read();
+      });
+    }
+    read();
+  }).catch(function() {
+    aDiv.textContent = '...（连接中断）';
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  });
+}
+
+function formatNotebookForLLM() {
+  var parts = [];
+  // Last 20 entries
+  var entries = G.notebook.entries;
+  var start = Math.max(0, entries.length - 20);
+  for (var i = start; i < entries.length; i++) {
+    var e = entries[i];
+    parts.push('[' + formatTime(e.timestamp) + '] ' + e.characterName + ' ' + e.action + ' ' + e.target + ' @' + e.location + ': ' + e.result);
+  }
+  // All deaths
+  if (G.notebook.deaths.length > 0) {
+    parts.push('\n--- DEATHS ---');
+    for (var d = 0; d < G.notebook.deaths.length; d++) {
+      var death = G.notebook.deaths[d];
+      parts.push(death.characterName + ' died at ' + formatTime(death.timestamp) + ' in ' + death.location + '. Last actions: ' + death.lastActions.join(' → '));
+    }
+  }
+  parts.push('\nCurrent character: ' + (G.currentCharacter ? G.currentCharacter.name : 'Unknown'));
+  parts.push('Total characters so far: ' + G.notebook.totalCharacters);
+  return parts.join('\n');
+}
+
+function processEquipment(response) {
+  var match = response.match(/\[EQUIP:\s*(.+?)\]/);
+  if (!match) return;
+  var item = match[1].trim().toLowerCase();
+  grantEquipment(item);
+}
