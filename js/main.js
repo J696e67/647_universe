@@ -35,8 +35,9 @@ var G = window.G = {
   pointerLocked: false,
 
   // Sky refs
-  sunLight: null, ambLight: null, skyUni: null,
-  starsMesh: null, sunMesh: null, moonMesh: null,
+  sunLight: null, ambLight: null, moonLight: null, skyUni: null, skyDomeMesh: null,
+  starsMesh: null, starsGroup: null, sunMesh: null, moonMesh: null,
+  _skyTiltQ: null, _skySpinQ: null,
 
   // World refs
   wheatMesh: null, wheatData: [],
@@ -92,6 +93,9 @@ var G = window.G = {
 
   // Leaderboard (Phase 6)
   discoveredIds: [],
+
+  // Death gravestones along PBC boundary
+  deathGravestones: [],
 
   // Start
   start: function() {
@@ -185,6 +189,9 @@ function init() {
   // Init leaderboard (Phase 6)
   initLeaderboard();
 
+  // Init death gravestones from any existing deaths
+  initDeathGravestones();
+
   // Controls
   setupControls();
 
@@ -248,6 +255,7 @@ function animate() {
       updateSmellProximity();
     }
   } else {
+    try {
     updatePlayer(dt);
     updateDayNight(t);
     updateWheat(t);
@@ -255,6 +263,8 @@ function animate() {
     updateAudio();
     updateTombstoneRing(t);
     updateTombstoneChat();
+    updateGravestones();
+    } catch(e) { document.title = e.message; console.error(e); }
   }
 
   G.ren.render(G.scene, G.cam);

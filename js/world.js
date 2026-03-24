@@ -254,6 +254,172 @@ function updateTombstoneRing(t) {
   }
 }
 
+// ===================== DEATH GRAVESTONES (PBC BOUNDARY RING) =====================
+var CAUSE_COLORS = {
+  'kcn_ingestion':             0x8844CC,
+  'cross_contamination_death': 0xCC4444,
+  'radiation_exposure':        0x44CC44,
+  'gas_inhalation':            0x4488CC,
+  'unknown':                   0x888888
+};
+
+var GRAVESTONE_RADIUS = 95;
+var GRAVESTONE_ANGLE_START = 0.3;
+var GRAVESTONE_ANGLE_STEP = 0.35;
+
+function getCauseColor(causeId) {
+  return CAUSE_COLORS[causeId] || CAUSE_COLORS['unknown'];
+}
+
+function pbcDuplicatePositions(gx, gz) {
+  var xOff = (gx > 0) ? -G.W : G.W;
+  var zOff = (gz > 0) ? -G.W : G.W;
+  return [[0, 0], [xOff, 0], [0, zOff], [xOff, zOff]];
+}
+
+function createGravestoneTexture(deathRecord) {
+  var canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 384;
+  var ctx = canvas.getContext('2d');
+
+  ctx.clearRect(0, 0, 256, 384);
+
+  // Character name
+  ctx.fillStyle = '#e0d4b8';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 28px sans-serif';
+  ctx.fillText(deathRecord.characterName, 128, 50);
+
+  // Divider
+  ctx.strokeStyle = 'rgba(224, 212, 184, 0.4)';
+  ctx.beginPath();
+  ctx.moveTo(40, 70);
+  ctx.lineTo(216, 70);
+  ctx.stroke();
+
+  // Location
+  ctx.font = '18px sans-serif';
+  ctx.fillStyle = '#aaa';
+  var loc = deathRecord.location || '';
+  if (loc.length > 24) loc = loc.substring(0, 22) + '...';
+  ctx.fillText(loc, 128, 100);
+
+  // Death message
+  ctx.font = '16px sans-serif';
+  ctx.fillStyle = '#cc8888';
+  ctx.fillText(deathRecord.message || '', 128, 135);
+
+  // Last actions (inquiry clues)
+  ctx.font = '14px sans-serif';
+  ctx.fillStyle = '#999';
+  var y = 175;
+  var actions = deathRecord.lastActions || [];
+  for (var i = 0; i < Math.min(actions.length, 4); i++) {
+    var text = actions[i];
+    if (text.length > 28) text = text.substring(0, 26) + '...';
+    ctx.fillText(text, 128, y);
+    y += 22;
+  }
+
+  // Timestamp
+  ctx.font = '12px sans-serif';
+  ctx.fillStyle = '#666';
+  if (typeof formatTime === 'function') {
+    ctx.fillText(formatTime(deathRecord.timestamp), 128, 350);
+  }
+
+  var tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function createDeathGravestone(deathRecord) {
+  var n = G.deathGravestones.length;
+
+  // Dynamic step if many deaths
+  var totalDeaths = G.notebook.deaths.length;
+  var step = Math.min(GRAVESTONE_ANGLE_STEP, (2 * Math.PI - 0.6) / Math.max(totalDeaths, 1));
+  var angle = GRAVESTONE_ANGLE_START + n * step;
+
+  var gx = Math.cos(angle) * GRAVESTONE_RADIUS;
+  var gz = Math.sin(angle) * GRAVESTONE_RADIUS;
+
+  var causeColor = getCauseColor(deathRecord.causeId);
+
+  // Slab geometry — pivot at base
+  var slabGeo = new THREE.BoxGeometry(0.6, 0.9, 0.08);
+  slabGeo.translate(0, 0.45, 0);
+  var slabMat = new THREE.MeshLambertMaterial({ color: causeColor });
+
+  // Text plane — local Z offset to sit on slab front face
+  var textTex = createGravestoneTexture(deathRecord);
+  var textMat = new THREE.MeshBasicMaterial({ map: textTex, transparent: true, depthWrite: false });
+  var textGeo = new THREE.PlaneGeometry(0.54, 0.82);
+  textGeo.translate(0, 0.45, 0.042);
+
+  var groups = [];
+  var offsets = pbcDuplicatePositions(gx, gz);
+
+  for (var i = 0; i < offsets.length; i++) {
+    var px = gx + offsets[i][0];
+    var pz = gz + offsets[i][1];
+    var py = tH(px, pz);
+
+    // Group holds slab + text as children, so rotation/scale applies to both
+    var group = new THREE.Group();
+    group.position.set(px, py, pz);
+    group.add(new THREE.Mesh(slabGeo, slabMat));
+    group.add(new THREE.Mesh(textGeo, textMat));
+    G.scene.add(group);
+    groups.push(group);
+  }
+
+  G.deathGravestones.push({ groups: groups, death: deathRecord, baseX: gx, baseZ: gz });
+}
+
+function initDeathGravestones() {
+  G.deathGravestones = [];
+  for (var i = 0; i < G.notebook.deaths.length; i++) {
+    createDeathGravestone(G.notebook.deaths[i]);
+  }
+}
+
+// Reverse perspective (深水王子 effect): farther = larger, closer = smaller.
+// D² scaling makes angular size grow linearly with distance.
+// Billboard: always faces the player.
+function updateGravestones() {
+  if (G.deathGravestones.length === 0) return;
+
+  for (var i = 0; i < G.deathGravestones.length; i++) {
+    var gs = G.deathGravestones[i];
+
+    // PBC-aware distance
+    var dist = pDist(G.px, G.pz, gs.baseX, gs.baseZ);
+
+    // D² reverse perspective: far = towering monolith, near = tiny marker
+    var scale = Math.max(0.15, Math.min(12.0, dist * dist * 0.003));
+
+    // Billboard: face toward player (PBC-aware direction)
+    var dx = G.px - gs.baseX;
+    var dz = G.pz - gs.baseZ;
+    dx -= G.W * Math.round(dx / G.W);
+    dz -= G.W * Math.round(dz / G.W);
+    var faceAngle = Math.atan2(dx, dz);
+
+    for (var j = 0; j < gs.groups.length; j++) {
+      gs.groups[j].scale.set(scale, scale, scale);
+      gs.groups[j].rotation.y = faceAngle;
+    }
+
+    // Proximity text overlay
+    if (G.alive && dist < 3) {
+      var d = gs.death;
+      showMsg(d.characterName + ' — ' + d.message + '\n' + d.location + '\n' + (d.lastActions || []).join(' → '), 3000);
+    }
+  }
+}
+
 // ===================== MAZE ENTRANCE (OUTDOOR) =====================
 function createEntrance() {
   var ey = tH(0, 0);

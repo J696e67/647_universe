@@ -34,7 +34,7 @@ function updateEffects(dt) {
 
     // Check for death
     if (eff.lethal && elapsed >= eff.delay) {
-      triggerDeath(eff.deathMessage);
+      triggerDeath(eff.deathMessage, eff.effectId);
       toRemove.push(i);
       break;
     }
@@ -59,7 +59,7 @@ function clearScreenFilters() {
   G.ren.domElement.style.filter = 'none';
 }
 
-function triggerDeath(message) {
+function triggerDeath(message, causeId) {
   G.alive = false;
   clearScreenFilters();
   hideActionMenu();
@@ -74,13 +74,18 @@ function triggerDeath(message) {
     }
   }
 
-  G.notebook.deaths.push({
+  var deathRecord = {
     characterName: char.name,
     timestamp: G.gameTime,
     location: getCurrentRoom() ? getCurrentRoom().name : (G.inMaze ? 'Maze Corridor' : 'Outdoors'),
     lastActions: lastActions,
-    message: message
-  });
+    message: message,
+    causeId: causeId || 'unknown'
+  };
+  G.notebook.deaths.push(deathRecord);
+
+  // Place gravestone on PBC boundary ring
+  createDeathGravestone(deathRecord);
 
   addNotebookEntry('death', char.name, getCurrentRoom() ? getCurrentRoom().name : 'Unknown', message);
 
