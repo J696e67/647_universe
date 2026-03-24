@@ -43,7 +43,7 @@ var G = window.G = {
   wheatMesh: null, wheatData: [],
   waterGeo1: null, waterGeo2: null,
   bookPos: null, tombPos: null,
-  houseWallSegs: [], tombRings: [],
+  houseWallSegs: [], tombRings: [], tombGroups: [],
 
   // Maze refs
   mazeH: [], mazeV: [],
@@ -255,7 +255,6 @@ function animate() {
       updateSmellProximity();
     }
   } else {
-    try {
     updatePlayer(dt);
     updateDayNight(t);
     updateWheat(t);
@@ -264,7 +263,6 @@ function animate() {
     updateTombstoneRing(t);
     updateTombstoneChat();
     updateGravestones();
-    } catch(e) { document.title = e.message; console.error(e); }
   }
 
   G.ren.render(G.scene, G.cam);

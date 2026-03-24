@@ -218,26 +218,39 @@ function houseCollide(x, z) {
   return false;
 }
 
-// ===================== TOMBSTONE (RING) =====================
+// ===================== TOMBSTONE (RING) — 深水王子 reverse perspective =====================
 function createTombstone() {
   var ringMat = new THREE.MeshLambertMaterial({ color: 0x8898A8 });
   var baseMat = new THREE.MeshLambertMaterial({ color: 0x607070 });
   var glowMat = new THREE.MeshBasicMaterial({ color: 0xAABBCC, transparent: true, opacity: 0.3 });
 
+  G.tombGroups = [];
+
   function makeRing(sx, sz) {
     var sy = tH(sx, sz);
+    var group = new THREE.Group();
+    group.position.set(sx, sy, sz);
+
     var base = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 0.4, 8), baseMat);
-    base.position.set(sx, sy+0.2, sz); G.scene.add(base);
+    base.position.set(0, 0.2, 0);
+    group.add(base);
+
     var pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.0, 6), baseMat);
-    pillar.position.set(sx, sy+0.9, sz); G.scene.add(pillar);
+    pillar.position.set(0, 0.9, 0);
+    group.add(pillar);
+
     var torus = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.07, 12, 36), ringMat);
-    torus.position.set(sx, sy+2.0, sz);
-    torus.userData.baseY = sy + 2.0;
-    G.scene.add(torus);
+    torus.position.set(0, 2.0, 0);
+    torus.userData.baseY = 2.0;
+    group.add(torus);
     G.tombRings.push(torus);
-    // Glow sphere
+
     var glow = new THREE.Mesh(new THREE.SphereGeometry(0.8, 8, 8), glowMat);
-    glow.position.set(sx, sy+2.0, sz); G.scene.add(glow);
+    glow.position.set(0, 2.0, 0);
+    group.add(glow);
+
+    G.scene.add(group);
+    G.tombGroups.push(group);
   }
 
   makeRing(G.TMB_X, G.TMB_Z);
@@ -246,11 +259,22 @@ function createTombstone() {
 }
 
 function updateTombstoneRing(t) {
+  // Torus animation (rotation + bob)
   for (var i = 0; i < G.tombRings.length; i++) {
     var ring = G.tombRings[i];
     ring.rotation.y = t * 0.3;
     ring.rotation.x = Math.sin(t * 0.5) * 0.12;
     ring.position.y = ring.userData.baseY + Math.sin(t * 0.7) * 0.08;
+  }
+
+  // 深水王子 reverse perspective: scale = dist / 5, clamped to [1, 25]
+  // At interaction distance (5m): scale=1 (current size)
+  // At starting point (~86m): scale≈17 (appears house-height)
+  // Constant apparent angular size — defies normal perspective
+  var dist = pDist(G.px, G.pz, G.tombPos.x, G.tombPos.z);
+  var scale = Math.max(1.0, Math.min(25.0, dist / 5.0));
+  for (var j = 0; j < G.tombGroups.length; j++) {
+    G.tombGroups[j].scale.set(scale, scale, scale);
   }
 }
 
@@ -366,9 +390,9 @@ function createDeathGravestone(deathRecord) {
     var pz = gz + offsets[i][1];
     var py = tH(px, pz);
 
-    // Group holds slab + text as children, so rotation/scale applies to both
     var group = new THREE.Group();
     group.position.set(px, py, pz);
+    group.rotation.y = angle + Math.PI;  // face inward toward center
     group.add(new THREE.Mesh(slabGeo, slabMat));
     group.add(new THREE.Mesh(textGeo, textMat));
     G.scene.add(group);
@@ -385,37 +409,16 @@ function initDeathGravestones() {
   }
 }
 
-// Reverse perspective (深水王子 effect): farther = larger, closer = smaller.
-// D² scaling makes angular size grow linearly with distance.
-// Billboard: always faces the player.
+// Normal perspective gravestones — proximity text only
 function updateGravestones() {
-  if (G.deathGravestones.length === 0) return;
-
+  if (G.deathGravestones.length === 0 || !G.alive) return;
   for (var i = 0; i < G.deathGravestones.length; i++) {
     var gs = G.deathGravestones[i];
-
-    // PBC-aware distance
     var dist = pDist(G.px, G.pz, gs.baseX, gs.baseZ);
-
-    // D² reverse perspective: far = towering monolith, near = tiny marker
-    var scale = Math.max(0.15, Math.min(12.0, dist * dist * 0.003));
-
-    // Billboard: face toward player (PBC-aware direction)
-    var dx = G.px - gs.baseX;
-    var dz = G.pz - gs.baseZ;
-    dx -= G.W * Math.round(dx / G.W);
-    dz -= G.W * Math.round(dz / G.W);
-    var faceAngle = Math.atan2(dx, dz);
-
-    for (var j = 0; j < gs.groups.length; j++) {
-      gs.groups[j].scale.set(scale, scale, scale);
-      gs.groups[j].rotation.y = faceAngle;
-    }
-
-    // Proximity text overlay
-    if (G.alive && dist < 3) {
+    if (dist < 3) {
       var d = gs.death;
       showMsg(d.characterName + ' — ' + d.message + '\n' + d.location + '\n' + (d.lastActions || []).join(' → '), 3000);
+      return;
     }
   }
 }
