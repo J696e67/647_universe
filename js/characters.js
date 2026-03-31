@@ -53,6 +53,7 @@ function respawnCharacter() {
   var gy = groundH(G.px, G.pz);
   G.cam.position.set(G.px, gy + G.EYE, G.pz);
 
+  saveGame();
   spawnCharacter();
 
   // Fade in

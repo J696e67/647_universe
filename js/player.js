@@ -23,6 +23,20 @@ function setupControls() {
     if (e.code === 'KeyN') {
       toggleNotebook();
     }
+    if (e.code === 'KeyR') {
+      if (G.inMaze) {
+        var lx = ((G.mpx + G.MHALF) % G.MSIZE + G.MSIZE) % G.MSIZE;
+        var lz = ((G.mpz + G.MHALF) % G.MSIZE + G.MSIZE) % G.MSIZE;
+        var col = Math.floor(lx / G.MCELL);
+        var row = Math.floor(lz / G.MCELL);
+        G.mpx = (col + 0.5) * G.MCELL - G.MHALF;
+        G.mpz = (row + 0.5) * G.MCELL - G.MHALF;
+      } else {
+        G.px = G.HSE_X;
+        G.pz = G.HSE_Z + 4;
+      }
+      showMsg('R — position reset');
+    }
   });
   document.addEventListener('keyup', function(e) { G.keys[e.code] = false; });
 

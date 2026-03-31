@@ -23,6 +23,7 @@ function contaminateSurface(surfaceId, substanceId, characterName) {
       depositedBy: characterName,
       timestamp: G.gameTime
     });
+    saveGame();
   }
 }
 

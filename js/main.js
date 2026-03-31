@@ -184,6 +184,14 @@ function init() {
   initCharacters();
   initNotebook();
 
+  // Restore saved game state (overrides fresh init)
+  if (loadGame()) {
+    var savedName = G.notebook.currentCharacter || G.characterNames[G.characterIndex] || 'Explorer';
+    G.currentCharacter.name = savedName;
+    G.notebook.currentCharacter = savedName;
+    document.getElementById('char-name').textContent = savedName;
+  }
+
   // Init tombstone (Phase 5)
   initTombstoneChat();
 
