@@ -24,7 +24,8 @@ var G = window.G = {
   MSIZE: 64, MHALF: 32,
 
   // Player state
-  px: 0, pz: 8, yaw: -0.3, pitch: 0,
+  px: 0, pz: 8, yaw: 1.83, pitch: 0.05,
+  TIME_OFFSET: 94,
   inMaze: false,
   mpx: 0, mpz: 0,
   savedOutdoorPos: { x: 0, z: 0, yaw: 0 },
@@ -256,7 +257,7 @@ function animate() {
     }
   } else {
     updatePlayer(dt);
-    updateDayNight(t);
+    updateDayNight(t + G.TIME_OFFSET);
     updateWheat(t);
     updateWater(t);
     updateAudio();

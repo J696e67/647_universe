@@ -111,7 +111,7 @@ function sendTombstoneMsg(msg) {
   // Build context from notebook
   var context = formatNotebookForLLM();
 
-  fetch('http://localhost:11434/api/generate', {
+  fetch('/api/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

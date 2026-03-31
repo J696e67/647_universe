@@ -1,9 +1,9 @@
 'use strict';
 
 // ===================== ASTRONOMICAL CONSTANTS =====================
-// Observer at 60°N latitude
-var SKY_LAT = 60 * Math.PI / 180;
-var SKY_COLAT = Math.PI / 2 - SKY_LAT;           // 30° co-latitude
+// Observer at Beijing latitude (39.9°N)
+var SKY_LAT = 39.9 * Math.PI / 180;
+var SKY_COLAT = Math.PI / 2 - SKY_LAT;
 var SKY_SUN_DECL = 15 * Math.PI / 180;            // Sun declination (~late spring)
 var SKY_MOON_SYNODIC = 8;                          // Moon synodic period in game days
 var SKY_MOON_INCL = 5.14 * Math.PI / 180;         // Moon orbital inclination
@@ -82,74 +82,248 @@ function createSky() {
   G.scene.add(G.skyDomeMesh);
 }
 
-// ===================== STARS (Full celestial sphere, 60°N) =====================
+// ===================== REAL STAR CATALOG =====================
+// [RA_hours, Dec_degrees, visual_magnitude, color_index]
+// Color index: 0=blue-white(B/A), 1=white(F), 2=yellow(G), 3=orange(K), 4=red(M)
+var STAR_COLORS = [
+  [0.75, 0.85, 1.0],   // 0 blue-white
+  [1.0, 1.0, 0.97],    // 1 white
+  [1.0, 0.95, 0.80],   // 2 yellow
+  [1.0, 0.80, 0.55],   // 3 orange
+  [1.0, 0.55, 0.35]    // 4 red
+];
+
+var STAR_CAT = [
+  // ===== Ursa Major (北斗七星) =====
+  [11.062, 61.75, 1.79, 3],  // 0  Dubhe α
+  [11.031, 56.38, 2.37, 1],  // 1  Merak β
+  [11.897, 53.69, 2.44, 1],  // 2  Phecda γ
+  [12.257, 57.03, 3.31, 1],  // 3  Megrez δ
+  [12.900, 55.96, 1.77, 1],  // 4  Alioth ε
+  [13.399, 54.93, 2.27, 1],  // 5  Mizar ζ
+  [13.792, 49.31, 1.86, 0],  // 6  Alkaid η
+
+  // ===== Ursa Minor (小熊座) =====
+  [2.530, 89.26, 1.98, 2],   // 7  Polaris α
+  [14.845, 74.16, 2.08, 3],  // 8  Kochab β
+  [15.345, 71.83, 3.00, 1],  // 9  Pherkad γ
+  [17.537, 86.59, 4.35, 1],  // 10 δ UMi
+  [16.766, 82.04, 4.23, 2],  // 11 ε UMi
+  [15.734, 77.79, 4.32, 1],  // 12 ζ UMi
+  [16.292, 75.76, 4.95, 1],  // 13 η UMi
+
+  // ===== Orion (猎户座) =====
+  [5.919, 7.41, 0.50, 4],    // 14 Betelgeuse α
+  [5.242, -8.20, 0.13, 0],   // 15 Rigel β
+  [5.419, 6.35, 1.64, 0],    // 16 Bellatrix γ
+  [5.533, -0.30, 2.23, 0],   // 17 Mintaka δ (belt)
+  [5.603, -1.20, 1.69, 0],   // 18 Alnilam ε (belt)
+  [5.679, -1.94, 1.77, 0],   // 19 Alnitak ζ (belt)
+  [5.796, -9.67, 2.09, 0],   // 20 Saiph κ
+
+  // ===== Cassiopeia (仙后座) =====
+  [0.153, 59.15, 2.27, 1],   // 21 Caph β
+  [0.675, 56.54, 2.23, 3],   // 22 Schedar α
+  [0.945, 60.72, 2.47, 0],   // 23 γ Cas
+  [1.430, 60.24, 2.68, 1],   // 24 Ruchbah δ
+  [1.907, 63.67, 3.38, 0],   // 25 Segin ε
+
+  // ===== Cygnus (天鹅座) =====
+  [20.691, 45.28, 1.25, 1],  // 26 Deneb α
+  [19.512, 27.96, 3.08, 3],  // 27 Albireo β
+  [20.370, 40.26, 2.20, 2],  // 28 Sadr γ
+  [20.770, 33.97, 2.48, 3],  // 29 ε Cyg
+  [19.750, 45.13, 2.87, 0],  // 30 δ Cyg
+
+  // ===== Leo (狮子座) =====
+  [10.139, 11.97, 1.35, 0],  // 31 Regulus α
+  [11.818, 14.57, 2.14, 1],  // 32 Denebola β
+  [10.333, 19.84, 2.08, 3],  // 33 Algieba γ
+  [11.235, 20.52, 2.56, 1],  // 34 Zosma δ
+  [9.764, 23.77, 2.98, 2],   // 35 ε Leo
+  [10.122, 16.76, 3.52, 1],  // 36 η Leo
+
+  // ===== Gemini (双子座) =====
+  [7.755, 28.03, 1.14, 3],   // 37 Pollux β
+  [7.577, 31.89, 1.58, 1],   // 38 Castor α
+  [6.629, 16.40, 1.93, 1],   // 39 Alhena γ
+  [6.383, 22.51, 2.88, 4],   // 40 Tejat μ
+  [6.732, 25.13, 2.98, 2],   // 41 Mebsuta ε
+  [7.335, 21.98, 3.53, 1],   // 42 Wasat δ
+
+  // ===== Taurus (金牛座) =====
+  [4.599, 16.51, 0.85, 3],   // 43 Aldebaran α
+  [5.438, 28.61, 1.65, 0],   // 44 Elnath β
+  [5.627, 21.14, 3.00, 0],   // 45 ζ Tau
+  [3.791, 24.11, 2.87, 0],   // 46 Alcyone (Pleiades)
+  [4.330, 15.63, 3.53, 3],   // 47 θ2 Tau (Hyades)
+  [4.477, 19.18, 3.65, 3],   // 48 ε Tau
+
+  // ===== Scorpius (天蝎座) =====
+  [16.490, -26.43, 0.96, 4], // 49 Antares α
+  [16.005, -22.62, 2.32, 0], // 50 Dschubba δ
+  [16.091, -19.81, 2.62, 0], // 51 Graffias β
+  [16.353, -25.59, 2.89, 0], // 52 σ Sco
+  [16.836, -34.29, 2.29, 3], // 53 ε Sco
+  [17.560, -37.10, 1.63, 0], // 54 Shaula λ
+
+  // ===== Lyra (天琴座) =====
+  [18.616, 38.78, 0.03, 1],  // 55 Vega α
+  [18.835, 33.36, 3.45, 0],  // 56 Sheliak β
+  [18.982, 32.69, 3.24, 0],  // 57 Sulafat γ
+
+  // ===== Aquila (天鹰座) =====
+  [19.846, 8.87, 0.77, 1],   // 58 Altair α
+  [19.771, 10.61, 2.72, 3],  // 59 Tarazed γ
+  [19.922, 6.41, 3.71, 2],   // 60 Alshain β
+
+  // ===== Bootes (牧夫座) =====
+  [14.261, 19.18, -0.05, 3], // 61 Arcturus α
+  [14.750, 27.07, 2.70, 3],  // 62 Izar ε
+  [13.912, 18.40, 2.68, 2],  // 63 Muphrid η
+  [14.535, 38.31, 3.03, 1],  // 64 Seginus γ
+  [15.258, 33.31, 3.47, 2],  // 65 δ Boo
+
+  // ===== Pegasus (飞马座 Great Square) =====
+  [23.079, 15.21, 2.49, 0],  // 66 Markab α
+  [23.063, 28.08, 2.42, 4],  // 67 Scheat β
+  [0.220, 15.18, 2.84, 0],   // 68 Algenib γ
+
+  // ===== Andromeda (仙女座) =====
+  [0.140, 29.09, 2.06, 0],   // 69 Alpheratz α
+  [1.162, 35.62, 2.06, 4],   // 70 Mirach β
+  [2.065, 42.33, 2.17, 3],   // 71 Almach γ
+
+  // ===== Draco (天龙座) =====
+  [17.943, 51.49, 2.23, 3],  // 72 Eltanin γ
+  [17.507, 52.30, 2.79, 2],  // 73 Rastaban β
+  [16.400, 61.51, 2.74, 2],  // 74 η Dra
+  [14.073, 64.38, 3.65, 1],  // 75 Thuban α
+  [17.147, 65.71, 3.17, 0],  // 76 ζ Dra
+  [15.415, 58.97, 3.29, 2],  // 77 χ Dra
+  [12.558, 69.79, 3.83, 1],  // 78 κ Dra
+
+  // ===== Individual bright stars =====
+  [6.752, -16.72, -1.46, 1], // 79 Sirius α CMa
+  [7.655, 5.22, 0.34, 2],    // 80 Procyon α CMi
+  [5.278, 45.99, 0.08, 2],   // 81 Capella α Aur
+  [13.420, -11.16, 0.97, 0], // 82 Spica α Vir
+  [15.578, 26.71, 2.23, 1],  // 83 Alphecca α CrB
+  [22.961, -29.62, 1.16, 1], // 84 Fomalhaut α PsA
+  [3.405, 49.86, 1.79, 2],   // 85 Mirfak α Per
+  [3.136, 40.96, 2.12, 0],   // 86 Algol β Per
+  [5.995, 44.95, 2.69, 1],   // 87 Menkalinan β Aur
+  [6.378, -17.96, 1.50, 0],  // 88 Mirzam β CMa
+  [4.950, -5.91, 3.69, 0],   // 89 Orion Nebula region (θ1 Ori)
+  [22.717, -0.32, 2.39, 2],  // 90 Sadalsuud β Aqr
+  [1.628, -10.18, 2.04, 0],  // 91 Diphda β Cet
+];
+
+// Constellation line pairs (indices into STAR_CAT)
+var CONST_LINES = [
+  // Ursa Major (Big Dipper) — bowl + handle
+  [0,1], [1,2], [2,3], [3,0], [3,4], [4,5], [5,6],
+  // Ursa Minor (Little Dipper) — bowl + handle to Polaris
+  [8,9], [9,13], [13,12], [12,8], [12,11], [11,10], [10,7],
+  // Orion — shoulders, belt, feet
+  [14,16], [14,19], [16,17], [17,18], [18,19], [19,20], [20,15], [15,17],
+  // Cassiopeia (W)
+  [21,22], [22,23], [23,24], [24,25],
+  // Cygnus (Northern Cross)
+  [26,28], [28,27], [30,28], [28,29],
+  // Leo — sickle + triangle
+  [35,33], [33,36], [36,31], [31,32], [32,34], [34,33],
+  // Gemini
+  [38,41], [41,40], [37,42], [42,39], [38,37],
+  // Taurus (V from Aldebaran)
+  [48,43], [43,47], [44,45],
+  // Scorpius (hook)
+  [51,50], [50,52], [52,49], [49,53], [53,54],
+  // Lyra (triangle)
+  [55,56], [56,57], [57,55],
+  // Aquila
+  [59,58], [58,60],
+  // Bootes (kite)
+  [61,62], [62,64], [64,65], [65,61], [61,63],
+  // Great Square of Pegasus + Andromeda
+  [66,67], [67,69], [69,68], [68,66], [69,70], [70,71],
+  // Draco (winding)
+  [72,73], [73,76], [76,74], [74,77], [77,75], [75,78],
+  // Summer Triangle (Vega-Deneb-Altair)
+  [55,26], [26,58], [58,55],
+];
+
+// ===================== STARS (Real catalog + background) =====================
 function createStars() {
-  var N_BASE = 1200;   // Uniform across full sphere
-  var N_MW = 400;       // Extra density for Milky Way band
-  var N = N_BASE + N_MW;
   var R = SKY_CELEST_R;
+  var N_CAT = STAR_CAT.length;
+  var N_BG = 800;
+  var N_MW = 300;
+  var N = N_CAT + N_BG + N_MW;
 
   var pos = new Float32Array(N * 3);
   var col = new Float32Array(N * 3);
   var siz = new Float32Array(N);
 
-  // --- Uniform distribution on full celestial sphere ---
-  for (var i = 0; i < N_BASE; i++) {
+  // --- Catalog stars at real celestial positions ---
+  for (var i = 0; i < N_CAT; i++) {
+    var s = STAR_CAT[i];
+    var ra = s[0] * Math.PI / 12;
+    var dec = s[1] * Math.PI / 180;
+    pos[i * 3]     = R * Math.cos(dec) * Math.cos(ra);
+    pos[i * 3 + 1] = R * Math.sin(dec);
+    pos[i * 3 + 2] = R * Math.cos(dec) * Math.sin(ra);
+
+    // Magnitude → point size (brighter = bigger)
+    siz[i] = Math.max(1.0, 4.0 - s[2] * 0.8);
+
+    var c = STAR_COLORS[s[3]];
+    col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2];
+  }
+
+  // --- Random dim background stars ---
+  for (var i = N_CAT; i < N_CAT + N_BG; i++) {
     var phi = Math.random() * 2 * Math.PI;
     var cosTheta = Math.random() * 2 - 1;
     var sinTheta = Math.sqrt(1 - cosTheta * cosTheta);
-    // Celestial coords: Y = toward North Celestial Pole
     pos[i * 3]     = R * sinTheta * Math.cos(phi);
     pos[i * 3 + 1] = R * cosTheta;
     pos[i * 3 + 2] = R * sinTheta * Math.sin(phi);
 
-    // Brightness: power-law distribution (many dim, few bright)
-    siz[i] = 0.4 + Math.pow(Math.random(), 3) * 1.8;
+    siz[i] = 0.3 + Math.pow(Math.random(), 4) * 1.0;
 
-    // Star color temperature variety
     var temp = Math.random();
     if (temp < 0.12) {
-      // Warm (K/M type, orange-red)
-      col[i * 3] = 1.0; col[i * 3 + 1] = 0.80; col[i * 3 + 2] = 0.60;
+      col[i*3] = 1.0; col[i*3+1] = 0.80; col[i*3+2] = 0.60;
     } else if (temp < 0.24) {
-      // Cool (B/A type, blue-white)
-      col[i * 3] = 0.70; col[i * 3 + 1] = 0.82; col[i * 3 + 2] = 1.0;
+      col[i*3] = 0.70; col[i*3+1] = 0.82; col[i*3+2] = 1.0;
     } else {
-      // White (F/G type)
-      col[i * 3] = 1.0; col[i * 3 + 1] = 1.0; col[i * 3 + 2] = 0.97;
+      col[i*3] = 1.0; col[i*3+1] = 1.0; col[i*3+2] = 0.97;
     }
   }
 
-  // --- Milky Way band (galactic plane approximation) ---
-  // Galactic plane inclined ~63° to celestial equator, ascending node at RA ~283°
+  // --- Milky Way band ---
   var galIncl = 62.87 * Math.PI / 180;
   var galNode = 282.86 * Math.PI / 180;
 
-  for (var i = N_BASE; i < N; i++) {
-    // Generate near the galactic equator (narrow band in galactic latitude)
+  for (var i = N_CAT + N_BG; i < N; i++) {
     var glon = Math.random() * 2 * Math.PI;
-    var glat = (Math.random() - 0.5) * 0.35;  // ±10° band
-    var cx = Math.cos(glat) * Math.cos(glon);
-    var cy = Math.sin(glat);
-    var cz = Math.cos(glat) * Math.sin(glon);
-
-    // Rotate by galactic inclination around X-axis
-    var ry = cy * Math.cos(galIncl) - cz * Math.sin(galIncl);
-    var rz = cy * Math.sin(galIncl) + cz * Math.cos(galIncl);
-
-    // Rotate by ascending node around Y-axis
-    var fx = cx * Math.cos(galNode) + rz * Math.sin(galNode);
-    var fz = -cx * Math.sin(galNode) + rz * Math.cos(galNode);
-
+    var glat = (Math.random() - 0.5) * 0.35;
+    var cx2 = Math.cos(glat) * Math.cos(glon);
+    var cy2 = Math.sin(glat);
+    var cz2 = Math.cos(glat) * Math.sin(glon);
+    var ry = cy2 * Math.cos(galIncl) - cz2 * Math.sin(galIncl);
+    var rz = cy2 * Math.sin(galIncl) + cz2 * Math.cos(galIncl);
+    var fx = cx2 * Math.cos(galNode) + rz * Math.sin(galNode);
+    var fz = -cx2 * Math.sin(galNode) + rz * Math.cos(galNode);
     pos[i * 3]     = fx * R;
     pos[i * 3 + 1] = ry * R;
     pos[i * 3 + 2] = fz * R;
-
     siz[i] = 0.2 + Math.random() * 0.5;
-    col[i * 3] = 0.92; col[i * 3 + 1] = 0.92; col[i * 3 + 2] = 0.97;
+    col[i*3] = 0.92; col[i*3+1] = 0.92; col[i*3+2] = 0.97;
   }
 
-  // --- Geometry & Shader ---
+  // --- Star points geometry & shader ---
   var geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('aSize', new THREE.BufferAttribute(siz, 1));
@@ -260,7 +434,7 @@ function updateDayNight(elapsed) {
   var phase = (elapsed % G.CYCLE) / G.CYCLE;
 
   // ================================================================
-  // SUN — realistic path at 60°N, declination 15° (late spring)
+  // SUN — realistic path at 39.9°N, declination 15° (late spring)
   // ================================================================
   var sunHA = phase * 2 * Math.PI - SKY_HA_RISE;
   var sunHoriz = eqToHoriz(sunHA, SKY_SUN_DECL);
@@ -269,7 +443,7 @@ function updateDayNight(elapsed) {
     SKY_SUN_DIST * Math.sin(sunHoriz.alt),
     SKY_SUN_DIST * Math.cos(sunHoriz.alt) * Math.cos(sunHoriz.az)
   );
-  var sunH = Math.sin(sunHoriz.alt);  // normalized sun height [-1, 1]
+  var sunH = Math.sin(sunHoriz.alt);
 
   // Center all sky objects on camera so sky dome edge is never visible
   var cx = G.cam.position.x, cz = G.cam.position.z;
@@ -296,14 +470,14 @@ function updateDayNight(elapsed) {
   G.moonMesh.position.set(_moonPos.x + cx, _moonPos.y, _moonPos.z + cz);
   G.moonMesh.visible = moonHoriz.alt > -0.1;
 
-  // Moon phase shader: sun direction from moon's perspective (relative vectors, offset cancels)
+  // Moon phase shader: sun direction from moon's perspective
   _sunDir.subVectors(_sunPos, _moonPos).normalize();
   G.moonMesh.material.uniforms.uSunDir.value.copy(_sunDir);
 
   // ================================================================
   // MOONLIGHT — intensity from phase and altitude
   // ================================================================
-  var moonPhase = (1 - Math.cos(elongation)) / 2;  // 0=new, 1=full
+  var moonPhase = (1 - Math.cos(elongation)) / 2;
   var moonAltFactor = skyClamp(Math.sin(moonHoriz.alt), 0, 1);
   G.moonLight.intensity = moonPhase * moonAltFactor * 0.3;
   G.moonLight.position.set(_moonPos.x + cx, _moonPos.y, _moonPos.z + cz);
@@ -340,12 +514,12 @@ function updateDayNight(elapsed) {
   G.ren.setClearColor(G.scene.fog.color);
 
   // ================================================================
-  // STARS — fade with daylight, rotate around celestial pole
+  // STARS & CONSTELLATION LINES — fade with daylight
   // ================================================================
-  G.starsMesh.material.uniforms.uOpacity.value = Math.max(0, (1 - day) * 1.2 - 0.1);
+  var starOp = Math.max(0, (1 - day) * 1.2 - 0.1);
+  G.starsMesh.material.uniforms.uOpacity.value = starOp;
 
   // Sidereal rotation: stars rotate once per game day around the celestial pole
-  // Celestial pole at 60° altitude toward north (after tilt)
   var siderealAngle = phase * 2 * Math.PI;
   G._skySpinQ.setFromAxisAngle(new THREE.Vector3(0, 1, 0), siderealAngle);
   G.starsGroup.quaternion.multiplyQuaternions(G._skyTiltQ, G._skySpinQ);

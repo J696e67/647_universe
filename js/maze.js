@@ -78,11 +78,12 @@ function clearRoomWalls() {
   }
 }
 
-// ===================== MAZE GEOMETRY =====================
+// ===================== MAZE GEOMETRY (ShenongHall style) =====================
 function buildMazeGeometry() {
   var positions = [], norms = [], indices = [];
   var vc = 0;
-  var wallW = 0.15;
+  var wallW = 0.8;
+  var hw = wallW / 2;
   var offsets = [
     [0,0],[G.MSIZE,0],[-G.MSIZE,0],[0,G.MSIZE],[0,-G.MSIZE],
     [G.MSIZE,G.MSIZE],[-G.MSIZE,G.MSIZE],[G.MSIZE,-G.MSIZE],[-G.MSIZE,-G.MSIZE]
@@ -96,24 +97,59 @@ function buildMazeGeometry() {
 
   for (var ti = 0; ti < offsets.length; ti++) {
     var ox = offsets[ti][0], oz = offsets[ti][1];
+    var y0 = G.MAZE_Y, y1 = G.MAZE_Y + G.MAZE_WALL_H;
+
     for (var r = 0; r < G.MROWS; r++) {
       for (var c = 0; c < G.MCOLS; c++) {
+
         if (G.mazeH[r][c]) {
-          var hx0 = c*G.MCELL - G.MHALF + ox;
+          var hz  = (r+1)*G.MCELL - G.MHALF + oz;
+          var rD  = (r+1) % G.MROWS;
+          var cL  = (c-1+G.MCOLS) % G.MCOLS;
+          var cR  = (c+1) % G.MCOLS;
+          // Adjacent collinear walls?
+          var adjL = G.mazeH[r][cL];
+          var adjR = G.mazeH[r][cR];
+          // Adjacent perpendicular walls at each end?
+          var perL = G.mazeV[r][cL] || G.mazeV[rD][cL];
+          var perR = G.mazeV[r][c]  || G.mazeV[rD][c];
+          // Natural boundaries — corner gaps filled by V-wall z-extension
+          var hx0 = c*G.MCELL     - G.MHALF + ox;
           var hx1 = (c+1)*G.MCELL - G.MHALF + ox;
-          var hz = (r+1)*G.MCELL - G.MHALF + oz;
-          var y0 = G.MAZE_Y, y1 = G.MAZE_Y + G.MAZE_WALL_H;
-          addQuad(hx0,y0,hz-wallW/2, hx1,y0,hz-wallW/2, hx1,y1,hz-wallW/2, hx0,y1,hz-wallW/2, 0,0,-1);
-          addQuad(hx1,y0,hz+wallW/2, hx0,y0,hz+wallW/2, hx0,y1,hz+wallW/2, hx1,y1,hz+wallW/2, 0,0,1);
+          // South face
+          addQuad(hx0,y0,hz-hw, hx1,y0,hz-hw, hx1,y1,hz-hw, hx0,y1,hz-hw,  0, 0,-1);
+          // North face
+          addQuad(hx1,y0,hz+hw, hx0,y0,hz+hw, hx0,y1,hz+hw, hx1,y1,hz+hw,  0, 0, 1);
+          // Top face
+          addQuad(hx0,y1,hz-hw, hx1,y1,hz-hw, hx1,y1,hz+hw, hx0,y1,hz+hw,  0, 1, 0);
+          // West end cap: only at genuine dead end (no collinear or perpendicular wall)
+          if (!adjL && !perL) addQuad(hx0,y0,hz-hw, hx0,y0,hz+hw, hx0,y1,hz+hw, hx0,y1,hz-hw, -1, 0, 0);
+          // East end cap
+          if (!adjR && !perR) addQuad(hx1,y0,hz+hw, hx1,y0,hz-hw, hx1,y1,hz-hw, hx1,y1,hz+hw,  1, 0, 0);
         }
+
         if (G.mazeV[r][c]) {
-          var vx = (c+1)*G.MCELL - G.MHALF + ox;
-          var vz0 = r*G.MCELL - G.MHALF + oz;
-          var vz1 = (r+1)*G.MCELL - G.MHALF + oz;
-          var vy0 = G.MAZE_Y, vy1 = G.MAZE_Y + G.MAZE_WALL_H;
-          addQuad(vx-wallW/2,vy0,vz1, vx-wallW/2,vy0,vz0, vx-wallW/2,vy1,vz0, vx-wallW/2,vy1,vz1, -1,0,0);
-          addQuad(vx+wallW/2,vy0,vz0, vx+wallW/2,vy0,vz1, vx+wallW/2,vy1,vz1, vx+wallW/2,vy1,vz0, 1,0,0);
+          var vx  = (c+1)*G.MCELL - G.MHALF + ox;
+          var rU  = (r-1+G.MROWS) % G.MROWS;
+          var cR2 = (c+1) % G.MCOLS;
+          var adjU = G.mazeV[rU][c];
+          var adjD = G.mazeV[(r+1)%G.MROWS][c];
+          var perT = G.mazeH[rU][c] || G.mazeH[rU][cR2];
+          var perB = G.mazeH[r][c]  || G.mazeH[r][cR2];
+          var vz0 = r*G.MCELL     - G.MHALF + oz - (perT ? hw : 0);
+          var vz1 = (r+1)*G.MCELL - G.MHALF + oz + (perB ? hw : 0);
+          // West face
+          addQuad(vx-hw,y0,vz1, vx-hw,y0,vz0, vx-hw,y1,vz0, vx-hw,y1,vz1, -1, 0, 0);
+          // East face
+          addQuad(vx+hw,y0,vz0, vx+hw,y0,vz1, vx+hw,y1,vz1, vx+hw,y1,vz0,  1, 0, 0);
+          // Top face
+          addQuad(vx-hw,y1,vz0, vx+hw,y1,vz0, vx+hw,y1,vz1, vx-hw,y1,vz1,  0, 1, 0);
+          // North end cap: only at genuine dead end
+          if (!adjU && !perT) addQuad(vx+hw,y0,vz0, vx-hw,y0,vz0, vx-hw,y1,vz0, vx+hw,y1,vz0,  0, 0,-1);
+          // South end cap
+          if (!adjD && !perB) addQuad(vx-hw,y0,vz1, vx+hw,y0,vz1, vx+hw,y1,vz1, vx-hw,y1,vz1,  0, 0, 1);
         }
+
       }
     }
   }
@@ -122,55 +158,66 @@ function buildMazeGeometry() {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geo.setAttribute('normal', new THREE.Float32BufferAttribute(norms, 3));
   geo.setIndex(indices);
-  G.mazeMesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0xA09870 }));
+  // ShenongHall wall material: warm gray-beige, matte
+  G.mazeMesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color: 0x8a8a85, roughness: 0.85, metalness: 0.05
+  }));
   G.scene.add(G.mazeMesh);
 
-  // Floor
+  // Floor — dark gray-brown, very matte
   var floorGeo = new THREE.PlaneGeometry(200, 200, 20, 20);
   floorGeo.rotateX(-Math.PI / 2);
   var fc = new Float32Array(floorGeo.attributes.position.count * 3);
   for (var i = 0; i < fc.length; i += 3) {
-    var s = 0.92 + Math.random()*0.08;
-    fc[i] = 0.50*s; fc[i+1] = 0.44*s; fc[i+2] = 0.31*s;
+    var s = 0.92 + Math.random() * 0.08;
+    fc[i] = 0.35 * s; fc[i+1] = 0.35 * s; fc[i+2] = 0.33 * s;
   }
   floorGeo.setAttribute('color', new THREE.BufferAttribute(fc, 3));
-  G.mazeFloor = new THREE.Mesh(floorGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  G.mazeFloor = new THREE.Mesh(floorGeo, new THREE.MeshStandardMaterial({
+    vertexColors: true, roughness: 0.9, metalness: 0.05
+  }));
   G.mazeFloor.position.y = G.MAZE_Y;
   G.scene.add(G.mazeFloor);
 
-  // Ceiling
+  // Ceiling — lighter gray, matte
   var ceilGeo = new THREE.PlaneGeometry(200, 200);
   ceilGeo.rotateX(Math.PI / 2);
-  G.mazeCeiling = new THREE.Mesh(ceilGeo, new THREE.MeshLambertMaterial({ color: 0x908868 }));
+  G.mazeCeiling = new THREE.Mesh(ceilGeo, new THREE.MeshStandardMaterial({
+    color: 0x9a9a95, roughness: 0.8, metalness: 0.05
+  }));
   G.mazeCeiling.position.y = G.MAZE_Y + G.MAZE_WALL_H;
   G.scene.add(G.mazeCeiling);
 }
 
-// ===================== MAZE LIGHTS =====================
+// ===================== MAZE LIGHTS (fluorescent style) =====================
 function createMazeLights() {
-  // Player light
-  G.mazePlayerLight = new THREE.PointLight(0xFFEECC, 0, 15);
+  // Player light — pale blue-white fluorescent
+  G.mazePlayerLight = new THREE.PointLight(0xeeeef5, 0, 15);
   G.mazePlayerLight.position.set(0, G.MAZE_Y + G.MAZE_WALL_H - 0.3, 0);
   G.scene.add(G.mazePlayerLight);
 
-  // Fixed lights at intersections
+  // Fixed fluorescent lights at intersections
   for (var r = 1; r < G.MROWS; r += 3) {
     for (var c = 1; c < G.MCOLS; c += 3) {
       var lx = (c+0.5)*G.MCELL - G.MHALF;
       var lz = (r+0.5)*G.MCELL - G.MHALF;
-      var fl = new THREE.PointLight(0xFFEECC, 0, 12);
+      var fl = new THREE.PointLight(0xeeeef5, 0, 12);
       fl.position.set(lx, G.MAZE_Y + G.MAZE_WALL_H - 0.3, lz);
-      fl.userData.baseIntensity = 0.3;
+      fl.userData.baseIntensity = 0.5;
       fl.userData.offset = Math.random() * 100;
       G.scene.add(fl);
       G.mazeLights.push(fl);
     }
   }
 
-  // Ceiling panels
-  var panelGeo = new THREE.PlaneGeometry(1.2, 0.3);
-  panelGeo.rotateX(Math.PI / 2);
-  var panelMat = new THREE.MeshBasicMaterial({ color: 0xEEDDCC });
+  // Ceiling light panels — emissive fluorescent strips
+  var panelGeo = new THREE.BoxGeometry(1.2, 0.02, 0.25);
+  var panelMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    emissive: 0xeeeef5,
+    emissiveIntensity: 0.8,
+    roughness: 0.3
+  });
   G.mazePanels = new THREE.InstancedMesh(panelGeo, panelMat, G.mazeLights.length);
   var pd = new THREE.Object3D();
   for (var i = 0; i < G.mazeLights.length; i++) {
@@ -185,7 +232,7 @@ function createMazeLights() {
   // Entrance marker
   var marker = new THREE.Mesh(
     new THREE.CylinderGeometry(0.6, 0.6, 0.02, 12),
-    new THREE.MeshBasicMaterial({ color: 0x557755 })
+    new THREE.MeshStandardMaterial({ color: 0x557755, roughness: 0.7, metalness: 0.1 })
   );
   marker.position.set(2, G.MAZE_Y + 0.02, 2);
   G.scene.add(marker);
@@ -193,7 +240,7 @@ function createMazeLights() {
 
 // ===================== MAZE COLLISION =====================
 function mazeCollide(x, z) {
-  var pad = 0.35;
+  var pad = 0.55;
   var lx = ((x + G.MHALF) % G.MSIZE + G.MSIZE) % G.MSIZE;
   var lz = ((z + G.MHALF) % G.MSIZE + G.MSIZE) % G.MSIZE;
   var col = Math.floor(lx / G.MCELL);
@@ -209,12 +256,14 @@ function mazeCollide(x, z) {
 
 // ===================== MAZE UPDATE =====================
 function updateMaze(t) {
+  // Fluorescent flicker
   for (var i = 0; i < G.mazeLights.length; i++) {
     var fl = G.mazeLights[i];
     if (fl.intensity > 0) {
       fl.intensity = fl.userData.baseIntensity
         + Math.sin(t*30 + fl.userData.offset)*0.025
-        + Math.sin(t*7 + fl.userData.offset*2)*0.015;
+        + Math.sin(t*47 + fl.userData.offset*2)*0.015
+        + Math.random()*0.008;
     }
   }
 }

@@ -2,7 +2,7 @@
 
 // ===================== RAYCASTER & INTERACTION =====================
 var senseRaycaster = new THREE.Raycaster();
-senseRaycaster.far = 3.0;
+senseRaycaster.far = 5.0;
 var currentTarget = null;
 var actionMenuVisible = false;
 

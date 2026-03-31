@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>神农堂 MVP & IJSG Strategy</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Georgia', serif; font-size: 11pt; color: #111; background: #fff; }
+  .page { max-width: 800px; margin: 0 auto; padding: 40px 60px; }
+
+  h1 { font-size: 20pt; font-weight: bold; text-align: center; margin-bottom: 6px; }
+  h2 { font-size: 14pt; font-weight: bold; margin-top: 28px; margin-bottom: 10px;
+       border-bottom: 1.5px solid #333; padding-bottom: 4px; }
+  h3 { font-size: 11.5pt; font-weight: bold; margin-top: 16px; margin-bottom: 6px; color: #222; }
+  h4 { font-size: 11pt; font-style: italic; margin-top: 12px; margin-bottom: 4px; color: #444; }
+
+  p { margin-bottom: 8px; line-height: 1.65; }
+  ul, ol { margin: 6px 0 10px 22px; line-height: 1.65; }
+  li { margin-bottom: 4px; }
+
+  .meta { text-align: center; color: #555; font-size: 10pt; margin-bottom: 30px; }
+  .abstract { background: #f7f7f7; border-left: 3px solid #999; padding: 12px 16px;
+              margin: 20px 0; font-size: 10.5pt; line-height: 1.6; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 10pt; }
+  th { background: #333; color: #fff; padding: 7px 10px; text-align: left; }
+  td { padding: 6px 10px; border-bottom: 1px solid #ddd; vertical-align: top; }
+  tr:nth-child(even) td { background: #f9f9f9; }
+
+  .tag-done { background: #2a7a2a; color: #fff; padding: 1px 6px; border-radius: 3px;
+              font-size: 9pt; font-family: monospace; }
+  .tag-partial { background: #a06000; color: #fff; padding: 1px 6px; border-radius: 3px;
+                 font-size: 9pt; font-family: monospace; }
+  .tag-missing { background: #8a0000; color: #fff; padding: 1px 6px; border-radius: 3px;
+                 font-size: 9pt; font-family: monospace; }
+  .tag-optional { background: #555; color: #fff; padding: 1px 6px; border-radius: 3px;
+                  font-size: 9pt; font-family: monospace; }
+
+  .callout { border: 1.5px solid #333; padding: 12px 16px; margin: 16px 0;
+             background: #fffdf0; }
+  .callout strong { display: block; margin-bottom: 4px; font-size: 11pt; }
+
+  .timeline { margin: 10px 0; }
+  .timeline-item { display: flex; margin-bottom: 8px; }
+  .timeline-week { min-width: 90px; font-weight: bold; color: #444; font-size: 10pt; }
+  .timeline-content { flex: 1; font-size: 10pt; line-height: 1.5; }
+
+  .section-num { color: #888; margin-right: 6px; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
+
+  @media print {
+    body { font-size: 10.5pt; }
+    .page { padding: 20px 40px; }
+    h2 { page-break-after: avoid; }
+    table { page-break-inside: avoid; }
+    .callout { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>神农堂（Shennong Hall）v2</h1>
+<div class="meta">
+  现有版本功能清单 · MVP 差距分析 · IJSG 投稿策略<br>
+  内部工作文件 — 2026-03-31
+</div>
+
+<div class="abstract">
+  <strong>摘要</strong>
+  神农堂是一款以"在未知原因中死去并调查自己的死亡"为核心机制的第一人称科学探究游戏。玩家在一个周期性边界（PBC）宇宙中以多条命探索，通过五感与物质和表面互动，积累跨角色笔记，逐步重建死亡的因果链。本文记录现有版本的完整功能状态，分析距离可发表 MVP 的差距，并给出针对 International Journal of Serious Games（IJSG）的投稿策略。
+</div>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">1</span>现有版本功能总览</h2>
+
+<h3>1.1 外部世界（647号宇宙）</h3>
+<table>
+  <tr><th>功能</th><th>状态</th><th>说明</th></tr>
+  <tr>
+    <td>PBC 开放世界（200×200）</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>无缝环绕，向任意方向走足够远会回到原点</td>
+  </tr>
+  <tr>
+    <td>开场视角朝西，对着落日方向</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>yaw=1.83，TIME_OFFSET=94，开场黄金时段约 6° 太阳仰角</td>
+  </tr>
+  <tr>
+    <td>完整日夜循环（3 分钟/周期）</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>太阳、月亮独立轨道，天色渐变，自然过渡</td>
+  </tr>
+  <tr>
+    <td>真实星空（北京纬度 39.9°N）</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>92 颗命名星，真实 RA/Dec 坐标；猎户座、冬季大三角清晰可辨；800+背景暗星+银河带</td>
+  </tr>
+  <tr>
+    <td>环形墓碑（PBC 边界处）</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>缓慢旋转，近大远小（透视正确），位于世界边界语义位置</td>
+  </tr>
+  <tr>
+    <td>麦田、树木、溪流</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>程序化放置，Instanced Mesh，手机流畅</td>
+  </tr>
+  <tr>
+    <td>房子：桌子 + 书《时间之外的往事》</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>点击书可显示文本</td>
+  </tr>
+  <tr>
+    <td>迷宫入口（凹地 + 四柱）</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>空格/点击进入，过渡动画</td>
+  </tr>
+  <tr>
+    <td>程序化环境音效</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>风声、溪流声，进迷宫后切换为荧光灯嗡嗡声</td>
+  </tr>
+</table>
+
+<h3>1.2 内部迷宫</h3>
+<table>
+  <tr><th>功能</th><th>状态</th><th>说明</th></tr>
+  <tr>
+    <td>PBC 迷宫（16×16 格）</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>绕圈走会回到同一房间，设计刻意让玩家察觉不到</td>
+  </tr>
+  <tr>
+    <td>荧光灯随玩家前进亮起</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>Backrooms 后室风格，闪烁效果</td>
+  </tr>
+  <tr>
+    <td>墙体厚度与接合（正在修复）</td>
+    <td><span class="tag-partial">进行中</span></td>
+    <td>今日刚修改 H 墙不做 x 方向延伸，由 V 墙 z 延伸填角，待验证</td>
+  </tr>
+  <tr>
+    <td>移动碰撞</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>pad=0.55，桌椅 AABB</td>
+  </tr>
+  <tr>
+    <td>触屏控制（delta 模式）</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>按住前进，划动转向，不丢方向</td>
+  </tr>
+</table>
+
+<h3>1.3 五感交互系统（核心机制）</h3>
+<table>
+  <tr><th>感官</th><th>状态</th><th>验证状态</th></tr>
+  <tr>
+    <td>视觉（Examine）</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>已验证：白色粉末"Fine white crystalline powder"</td>
+  </tr>
+  <tr>
+    <td>触觉（Touch）+ 残留传递</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>已验证：touch 白粉 → 手上留残留 → 触摸门把手 → 门把手被污染</td>
+  </tr>
+  <tr>
+    <td>味觉（Taste）</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>已验证：直接 taste 白粉致死；手上有残留再 taste 红果也致死</td>
+  </tr>
+  <tr>
+    <td>嗅觉（Smell，近距离主动）</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>已验证：苦杏仁气味描述</td>
+  </tr>
+  <tr>
+    <td>嗅觉（Smell，自动近身触发）</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>30 秒冷却，已验证</td>
+  </tr>
+  <tr>
+    <td>听觉（环境音）</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>各区域独立音效</td>
+  </tr>
+</table>
+
+<h3>1.4 死亡、角色与笔记系统</h3>
+<table>
+  <tr><th>功能</th><th>状态</th><th>说明</th></tr>
+  <tr>
+    <td>延迟效果与死亡触发</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>已验证：交叉污染死亡路径完整</td>
+  </tr>
+  <tr>
+    <td>角色死亡 → 新角色生成</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>10 个角色名池；死亡屏幕过渡；已验证</td>
+  </tr>
+  <tr>
+    <td>时间戳笔记（跨角色持久化）</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>所有 touch/taste/smell/examine 自动记录，死亡高亮显示</td>
+  </tr>
+  <tr>
+    <td>PBC 边界小墓碑（死亡标记）</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>每次死亡在边界生成小墓碑，已验证</td>
+  </tr>
+  <tr>
+    <td>墓碑 AI 对话（Ollama/phi3:mini）</td>
+    <td><span class="tag-partial">有缺陷</span></td>
+    <td>连接正常；三级分类 prompt（FACT/PROCEDURE/INQUIRY）设计完整；phi3:mini 有严重幻觉，会打印系统 prompt</td>
+  </tr>
+  <tr>
+    <td>发现排行榜</td>
+    <td><span class="tag-done">完成</span></td>
+    <td>4 个发现条件：KCN 直接致死、交叉污染、外部 PBC、内部 PBC</td>
+  </tr>
+</table>
+
+<h3>1.5 缺失功能</h3>
+<table>
+  <tr><th>功能</th><th>状态</th><th>重要性</th></tr>
+  <tr>
+    <td>装备系统（手套、口罩、盖革计数器）</td>
+    <td><span class="tag-missing">缺失</span></td>
+    <td>论文提及但未实现，降低实验可控性</td>
+  </tr>
+  <tr>
+    <td>Local 存档（跨会话持久化）</td>
+    <td><span class="tag-missing">缺失</span></td>
+    <td>刷新即丢失所有笔记和死亡记录，影响长期调查</td>
+  </tr>
+  <tr>
+    <td>Anti-stuck 机制</td>
+    <td><span class="tag-missing">缺失</span></td>
+    <td>玩家卡墙时无法脱困，影响游玩体验</td>
+  </tr>
+  <tr>
+    <td>场景 2+（辐射室、气体室等）</td>
+    <td><span class="tag-missing">缺失</span></td>
+    <td>MVP 可只有场景 1（KCN/交叉污染）</td>
+  </tr>
+  <tr>
+    <td>可靠的 LLM 后端</td>
+    <td><span class="tag-missing">缺失</span></td>
+    <td>phi3:mini 不够稳定；GPT-4o/Llama3 会显著提升</td>
+  </tr>
+  <tr>
+    <td>正式评估数据</td>
+    <td><span class="tag-missing">缺失</span></td>
+    <td>IJSG 发表必须有：至少专家评估或小 N 玩家测试</td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">2</span>理论定位与设计贡献</h2>
+
+<p>神农堂不是一个"教科学知识"的游戏，而是一个<strong>设计用于培养科学探究实践（scientific inquiry practices）的环境</strong>。其核心设计贡献有三：</p>
+
+<h3>贡献一：死亡即数据（Death as Data）</h3>
+<p>玩家的每次死亡不是失败，而是一个数据点。死亡后不重置知识——笔记跨角色持久。这将"失败"重新框架为"信息获取"，与真实科学实验中的负结果（negative results）同构。对标文献：Kapur（2016）的 Productive Failure 理论；Gee（2007）的"pleasantly frustrating"原则。</p>
+
+<h3>贡献二：隐藏因果链（Hidden Causal Chain）</h3>
+<p>玩家无法直接观察到：touch → residue → surface → next character → taste → death 这条链的每一步。游戏通过感官线索（苦杏仁味、粉末外观）引导玩家主动构建因果模型，而非呈现答案。这是 inquiry-based learning 的操作化实现。</p>
+
+<h3>贡献三：Socratic AI 墓碑</h3>
+<p>墓碑不给答案，只问问题——三级分类系统（FACT/PROCEDURE/INQUIRY）将 AI 的角色锁定为苏格拉底式引导者。这是将 LLM 约束于特定教学角色的具体设计方案，具有方法论价值，独立于 phi3:mini 的实际表现。</p>
+
+<h3>贡献四：双层 PBC 认识论隐喻</h3>
+<p>外部世界是 PBC（走一圈回到原处），迷宫也是 PBC。玩家若发现两个 PBC 并联系到"知识的循环验证本质"，即达成最高层次的认知发现。这是一个可测量的元认知目标。</p>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">3</span>IJSG 可发表 MVP 的最小完成列表</h2>
+
+<div class="callout">
+  <strong>IJSG Design Paper 的核心要求（4,000–8,000 词）</strong>
+  提出新颖的设计框架或方法论 + 通过专家评估或小规模用户测试验证其有效性 + 与现有工作的明确对比。
+</div>
+
+<h3>必须完成（无则无法投稿）</h3>
+<table>
+  <tr><th>#</th><th>任务</th><th>估计工作量</th></tr>
+  <tr>
+    <td>M1</td>
+    <td><strong>Local 存档（localStorage）</strong>：笔记和死亡记录跨会话持久化，玩家能在不同时间段继续调查</td>
+    <td>1–2 天</td>
+  </tr>
+  <tr>
+    <td>M2</td>
+    <td><strong>Anti-stuck 机制</strong>：按 R 或特定条件重置位置到安全点，防止玩家无法继续</td>
+    <td>半天</td>
+  </tr>
+  <tr>
+    <td>M3</td>
+    <td><strong>更换 LLM 后端</strong>：换用 Llama 3.1/3.3（8B+）或 GPT-4o API，消除系统 prompt 泄漏和严重幻觉。若资源受限，至少加 output guardrail 过滤掉系统 prompt 内容</td>
+    <td>1–3 天</td>
+  </tr>
+  <tr>
+    <td>M4</td>
+    <td><strong>基本装备系统</strong>：至少实现手套（防止残留传递），让 INQUIRY→EQUIPMENT→TEST 完整循环可运行</td>
+    <td>1 天</td>
+  </tr>
+  <tr>
+    <td>M5</td>
+    <td><strong>玩家测试 + 数据收集（最低 N=6）</strong>：找 6 名参与者自由游玩 45–60 分钟，收集：(a) 笔记内容截图、(b) 墓碑对话记录、(c) 最终发现的排行榜条目、(d) 半结构化出声思考或事后访谈。这是论文核心证据。</td>
+    <td>1–2 周</td>
+  </tr>
+  <tr>
+    <td>M6</td>
+    <td><strong>设计框架文档化</strong>：将现有设计决策整理为可引用的框架（见第 4 节），论文的理论贡献来自此处</td>
+    <td>3–5 天写作</td>
+  </tr>
+</table>
+
+<h3>强烈建议（显著提升接受率）</h3>
+<table>
+  <tr><th>#</th><th>任务</th><th>说明</th></tr>
+  <tr>
+    <td>R1</td>
+    <td><strong>专家走查（Expert Walkthrough）</strong></td>
+    <td>邀请 2–3 名科学教育或游戏设计领域研究者对游戏做启发式评估，用于补充用户测试数据</td>
+  </tr>
+  <tr>
+    <td>R2</td>
+    <td><strong>第二个死亡场景</strong></td>
+    <td>辐射场景（无味无色、延迟死亡）与 KCN 场景形成对比，展示设计框架的可扩展性</td>
+  </tr>
+  <tr>
+    <td>R3</td>
+    <td><strong>量化发现指标</strong></td>
+    <td>记录每个玩家何时（第几条命、花了多少分钟）达成 4 个发现条件，作为探究效率的代理指标</td>
+  </tr>
+</table>
+
+<h3>可以不做（MVP 范围外）</h3>
+<ul>
+  <li>场景 3、4（气体室等）</li>
+  <li>完整排行榜后端（本地即可）</li>
+  <li>手机 App 封装</li>
+  <li>多人联机</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">4</span>论文结构建议</h2>
+
+<p>建议以 <strong>Design Paper</strong> 形式投稿（非实验性论文），参考 IJSG 发表的框架类文章结构：</p>
+
+<table>
+  <tr><th>章节</th><th>内容</th><th>字数参考</th></tr>
+  <tr>
+    <td>1. Introduction</td>
+    <td>科学探究游戏的现有局限（知识灌输 vs. 过程培养）；本文贡献声明</td>
+    <td>500</td>
+  </tr>
+  <tr>
+    <td>2. Related Work</td>
+    <td>Inquiry-based learning games、productive failure、LLM 作为 Socratic tutor、PBC/boundary 游戏设计</td>
+    <td>800</td>
+  </tr>
+  <tr>
+    <td>3. Design Framework</td>
+    <td>提出"多命探究框架"（Multi-life Inquiry Framework）：4 个核心原则 + 设计模式</td>
+    <td>1,200</td>
+  </tr>
+  <tr>
+    <td>4. Implementation</td>
+    <td>神农堂的具体实现：世界设计、五感系统、隐藏因果链、笔记系统、墓碑 AI</td>
+    <td>1,500</td>
+  </tr>
+  <tr>
+    <td>5. Evaluation</td>
+    <td>玩家测试结果：发现路径分析、笔记内容编码、墓碑对话质量、启发式评估结果</td>
+    <td>1,500</td>
+  </tr>
+  <tr>
+    <td>6. Discussion</td>
+    <td>设计决策的权衡（为什么不给提示）；局限性；与现有工作的差异</td>
+    <td>600</td>
+  </tr>
+  <tr>
+    <td>7. Conclusion</td>
+    <td>贡献总结；未来工作（更多场景、纵向研究）</td>
+    <td>300</td>
+  </tr>
+  <tr>
+    <td><strong>合计</strong></td>
+    <td></td>
+    <td><strong>~6,400 词</strong></td>
+  </tr>
+</table>
+
+<h3>提议的论文标题</h3>
+<p style="font-style: italic; margin-left: 20px; padding: 8px; background: #f0f0f0; border-left: 3px solid #666;">
+  "Death as Data: Designing for Scientific Inquiry Through Repeated Mortality in a First-Person Serious Game"
+</p>
+<p>备选：</p>
+<ul>
+  <li><em>Investigating One's Own Death: A Multi-Life Framework for Inquiry-Based Learning in Serious Games</em></li>
+  <li><em>The Shennong Hall Framework: Embedding Causal Reasoning in Embodied First-Person Play</em></li>
+</ul>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">5</span>投稿策略与时间线</h2>
+
+<div class="callout">
+  <strong>IJSG 关键信息</strong>
+  全文 4,000–8,000 词 · IEEE 参考格式 · 双盲评审 · 开放获取（CC BY 4.0）· 无固定截止日期（滚动投稿）
+</div>
+
+<div class="timeline">
+  <div class="timeline-item">
+    <div class="timeline-week">Week 1–2</div>
+    <div class="timeline-content">完成 M1（存档）、M2（anti-stuck）、M4（手套）；更换 LLM 后端（M3）</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-week">Week 3–4</div>
+    <div class="timeline-content">招募 6–8 名参与者进行游玩测试（朋友、同学均可）；收集笔记截图、墓碑对话、出声思考录音；同步撰写第 3、4 章</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-week">Week 5</div>
+    <div class="timeline-content">数据分析与编码（发现路径、探究策略分类）；撰写第 5 章评估；完成专家走查（R1）</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-week">Week 6–7</div>
+    <div class="timeline-content">完整论文初稿；内部审阅；截图/图表制作（游戏截图 × 4，框架示意图 × 1，发现路径图 × 1）</div>
+  </div>
+  <div class="timeline-item">
+    <div class="timeline-week">Week 8</div>
+    <div class="timeline-content"><strong>投稿至 IJSG</strong>；同步将预印本上传 arXiv（IJSG 接受有 arXiv 预印本的投稿）</div>
+  </div>
+</div>
+
+<h3>投稿前检查清单</h3>
+<ul>
+  <li>□ 论文主体 4,000–8,000 词（不含标题、摘要、图注、参考文献）</li>
+  <li>□ 摘要 75–200 词，包含：目的、方法、发现、原创性、影响</li>
+  <li>□ 3–6 个关键词</li>
+  <li>□ 作者信息单独页（盲审版本中删除所有作者标识）</li>
+  <li>□ IEEE 格式参考文献</li>
+  <li>□ 所有图表有清晰图注</li>
+  <li>□ 游戏可在线访问（提供 URL 供评审测试）</li>
+</ul>
+
+<h3>关键参考文献（需引用）</h3>
+<ul>
+  <li>Gee, J.P. (2007). <em>What Video Games Have to Teach Us About Learning and Literacy</em>. Palgrave Macmillan.</li>
+  <li>Kapur, M. (2016). Examining productive failure, productive success, unproductive failure, and unproductive success in learning. <em>Educational Psychologist</em>, 51(2), 289–299.</li>
+  <li>Kiili, K. (2005). Digital game-based learning: Towards an experiential gaming model. <em>The Internet and Higher Education</em>, 8(1), 13–24.</li>
+  <li>Chin, C., & Osborne, J. (2008). Students' questions: A potential resource for teaching and learning science. <em>Studies in Science Education</em>, 44(1), 1–39.</li>
+  <li>Chaudhuri, J.D. (2023). Fostering scientific inquiry through game-based learning. [IJSG 或类似期刊中的近期相关工作]</li>
+  <li>IJSG 中已发表的 inquiry game 相关论文（需检索并引用 2–3 篇）</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2><span class="section-num">6</span>风险与替代方案</h2>
+
+<table>
+  <tr><th>风险</th><th>可能性</th><th>缓解方案</th></tr>
+  <tr>
+    <td>phi3:mini 替换困难，LLM 仍有幻觉</td>
+    <td>中</td>
+    <td>论文中将墓碑 AI 框架作为设计贡献，实现局限性作为 limitation 诚实讨论；或使用 GPT-4o API（少量测试费用）</td>
+  </tr>
+  <tr>
+    <td>N=6 玩家测试被评审认为不足</td>
+    <td>中</td>
+    <td>补充专家走查（2–3 人）；强调这是设计论文而非效果验证论文；引用 IJSG 中类似规模的发表先例</td>
+  </tr>
+  <tr>
+    <td>IJSG 评审认为贡献不足</td>
+    <td>低-中</td>
+    <td>如被拒，目标期刊降一档：Games and Culture、Computers & Education（开放获取）、CHI 短文</td>
+  </tr>
+  <tr>
+    <td>游戏迷宫墙体还有视觉问题</td>
+    <td>低</td>
+    <td>截图选取无 bug 角度；或标注为已知 visual artifact；不影响核心机制</td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<hr>
+<p style="text-align:center; color:#888; font-size:9.5pt; margin-top: 20px;">
+  内部文件 · 神农堂 v2 · 2026-03-31 · 如需打印为 PDF，在浏览器中使用 Ctrl+P / Cmd+P，选择"另存为 PDF"
+</p>
+
+</div>
+</body>
+</html>

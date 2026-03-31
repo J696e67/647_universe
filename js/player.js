@@ -55,8 +55,8 @@ function setupControls() {
     e.preventDefault();
     var t = e.touches[0];
     G.touch.on = true;
-    G.touch.sx = G.touch.cx = t.clientX;
-    G.touch.sy = G.touch.cy = t.clientY;
+    G.touch.sx = G.touch.cx = G.touch.lx = t.clientX;
+    G.touch.sy = G.touch.cy = G.touch.ly = t.clientY;
     G.touch.t0 = Date.now();
     if (!G.audioOn) initAudio();
     if (!G.hintShown) { G.hintShown = true; G.hintEl.style.opacity = '0'; }
@@ -73,7 +73,7 @@ function setupControls() {
     var dt = Date.now() - G.touch.t0;
     var dx = Math.abs(G.touch.cx - G.touch.sx);
     var dy = Math.abs(G.touch.cy - G.touch.sy);
-    if (dt < 300 && dx < 15 && dy < 15 && G.alive) tryInteract();
+    if (dt < 500 && dx < 30 && dy < 30 && G.alive) tryInteract();
     G.touch.on = false;
   }, { passive: false });
 
@@ -129,11 +129,13 @@ function updatePlayer(dt) {
   }
   if (G.touch.on) {
     moveF = 1;
-    var tdx = (G.touch.cx - G.touch.sx) / window.innerWidth;
-    var tdy = (G.touch.cy - G.touch.sy) / window.innerHeight;
-    G.yaw -= tdx * 3.0 * dt;
-    G.pitch += tdy * 2.0 * dt;
-    G.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, G.pitch));
+    var tdx = G.touch.cx - G.touch.lx;
+    var tdy = G.touch.cy - G.touch.ly;
+    G.yaw -= tdx * 0.004;
+    G.pitch -= tdy * 0.003;
+    G.pitch = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, G.pitch));
+    G.touch.lx = G.touch.cx;
+    G.touch.ly = G.touch.cy;
   }
 
   var sinY = Math.sin(G.yaw), cosY = Math.cos(G.yaw);
@@ -178,13 +180,15 @@ function updatePlayerMaze(dt) {
     if (G.keys['KeyA'] || G.keys['ArrowLeft']) moveR -= 1;
     if (G.keys['KeyD'] || G.keys['ArrowRight']) moveR += 1;
   }
-  if (G.touch.on) {
+  if (G.touch.on && !actionMenuVisible) {
     moveF = 1;
-    var tdx = (G.touch.cx - G.touch.sx) / window.innerWidth;
-    var tdy = (G.touch.cy - G.touch.sy) / window.innerHeight;
-    G.yaw -= tdx * 3.0 * dt;
-    G.pitch += tdy * 2.0 * dt;
-    G.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, G.pitch));
+    var tdx = G.touch.cx - G.touch.lx;
+    var tdy = G.touch.cy - G.touch.ly;
+    G.yaw -= tdx * 0.004;
+    G.pitch -= tdy * 0.003;
+    G.pitch = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, G.pitch));
+    G.touch.lx = G.touch.cx;
+    G.touch.ly = G.touch.cy;
   }
   var sinY = Math.sin(G.yaw), cosY = Math.cos(G.yaw);
   var nx = G.mpx + (-sinY * moveF + cosY * moveR) * G.SPD * dt;
@@ -257,12 +261,12 @@ function transitionToMaze() {
     G.mpx = 2; G.mpz = 2;
 
     G.scene.fog.near = 0.1; G.scene.fog.far = 18;
-    G.scene.fog.color.set(0x999966);
-    G.ren.setClearColor(0x999966);
+    G.scene.fog.color.set(0x1a1a1a);
+    G.ren.setClearColor(0x1a1a1a);
     G.sunLight.intensity = 0;
     G.sunMesh.visible = false; G.moonMesh.visible = false;
-    G.ambLight.color.set(0xCCBB88); G.ambLight.intensity = 0.5;
-    G.mazePlayerLight.intensity = 0.6;
+    G.ambLight.color.set(0x404050); G.ambLight.intensity = 0.25;
+    G.mazePlayerLight.intensity = 0.8;
     for (var i = 0; i < G.mazeLights.length; i++) G.mazeLights[i].intensity = G.mazeLights[i].userData.baseIntensity;
     // Show room lights
     for (var j = 0; j < G.roomLights.length; j++) G.roomLights[j].intensity = G.roomLights[j].userData.baseIntensity || 0.5;
