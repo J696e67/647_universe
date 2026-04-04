@@ -144,10 +144,22 @@ function formatTime(t) {
 function saveGame() {
   try {
     localStorage.setItem('647_save', JSON.stringify({
+      // v1 fields
       notebook:       G.notebook,
       surfaceStates:  G.surfaceStates,
       characterIndex: G.characterIndex,
-      discoveredIds:  G.discoveredIds
+      discoveredIds:  G.discoveredIds,
+      // v2: full game state
+      version: 2,
+      inMaze:   G.inMaze,
+      px: G.px, pz: G.pz, yaw: G.yaw, pitch: G.pitch,
+      mpx: G.mpx, mpz: G.mpz,
+      equipment: G.equipment,
+      handContamination: G.currentCharacter ? G.currentCharacter.handContamination : [],
+      alive: G.alive,
+      mazeGateShownForDeathCount: G.mazeGateShownForDeathCount || 0,
+      tombChatInited: G.tombChatInited,
+      tombGreetingShown: G.tombGreetingShown
     }));
   } catch(e) {}
 }
@@ -161,6 +173,23 @@ function loadGame() {
     if (data.surfaceStates)  G.surfaceStates  = data.surfaceStates;
     if (typeof data.characterIndex === 'number') G.characterIndex = data.characterIndex;
     if (data.discoveredIds)  G.discoveredIds  = data.discoveredIds;
+
+    // v2 fields
+    if (data.version >= 2) {
+      if (typeof data.px === 'number') { G.px = data.px; G.pz = data.pz; }
+      if (typeof data.yaw === 'number') { G.yaw = data.yaw; G.pitch = data.pitch || 0; }
+      if (typeof data.mpx === 'number') { G.mpx = data.mpx; G.mpz = data.mpz; }
+      if (data.equipment) G.equipment = data.equipment;
+      if (typeof data.mazeGateShownForDeathCount === 'number') G.mazeGateShownForDeathCount = data.mazeGateShownForDeathCount;
+      if (typeof data.tombChatInited === 'boolean') G.tombChatInited = data.tombChatInited;
+      if (typeof data.tombGreetingShown === 'boolean') G.tombGreetingShown = data.tombGreetingShown;
+
+      // Restore character hand contamination
+      G._pendingHandContamination = data.handContamination || [];
+
+      // Restore maze state (deferred to after scene is ready)
+      if (data.inMaze) G._pendingMazeRestore = true;
+    }
     return true;
   } catch(e) { return false; }
 }

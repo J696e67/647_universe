@@ -100,7 +100,7 @@ function sendTombstoneMsg(msg) {
 
   appendChatMsg('user', msg);
 
-  // AI placeholder
+  // Show thinking indicator
   var msgsEl = document.getElementById('chat-msgs');
   var aDiv = document.createElement('div');
   aDiv.className = 'chat-msg ai';
@@ -154,9 +154,29 @@ function sendTombstoneMsg(msg) {
     }
     read();
   }).catch(function() {
-    aDiv.textContent = '...（连接中断）';
+    // Offline fallback
+    var reply = offlineFallback(msg);
+    aDiv.textContent = reply;
+    G.notebook.tombstoneDialogue.push('[Tombstone]: ' + reply);
+    checkLeaderboardConditions();
     msgsEl.scrollTop = msgsEl.scrollHeight;
   });
+}
+
+var OFFLINE_REPLIES = [
+  '你不是第一个站在这的。',
+  '我见过比你话多的，他死了，你还活着。',
+  '我记得每一个名字。',
+  '死亡不是终点，是启示。',
+  '不知道做什么的时候，也许可以看看前人的墓碑。'
+];
+
+function offlineFallback(msg) {
+  var lower = msg.toLowerCase().replace(/\s+/g, '');
+  if (lower.indexOf('你是谁') !== -1 || lower.indexOf('who are you') !== -1 || lower.indexOf('whoareyou') !== -1) {
+    return '我是墓碑。';
+  }
+  return OFFLINE_REPLIES[Math.floor(Math.random() * OFFLINE_REPLIES.length)];
 }
 
 function formatNotebookForLLM() {

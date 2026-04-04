@@ -190,6 +190,12 @@ function init() {
     G.currentCharacter.name = savedName;
     G.notebook.currentCharacter = savedName;
     document.getElementById('char-name').textContent = savedName;
+
+    // Restore hand contamination
+    if (G._pendingHandContamination && G.currentCharacter) {
+      G.currentCharacter.handContamination = G._pendingHandContamination;
+    }
+    delete G._pendingHandContamination;
   }
 
   // Init tombstone (Phase 5)
@@ -197,6 +203,9 @@ function init() {
 
   // Init leaderboard (Phase 6)
   initLeaderboard();
+
+  // Init anti-stuck
+  initAntiStuck();
 
   // Init death gravestones from any existing deaths
   initDeathGravestones();
@@ -210,6 +219,27 @@ function init() {
     loadEl.style.opacity = '0';
     setTimeout(function() {
       loadEl.style.display = 'none';
+      // Restore maze state if saved mid-maze
+      if (G._pendingMazeRestore) {
+        delete G._pendingMazeRestore;
+        G.inMaze = true;
+        G.mazeExitReady = true;
+        G.scene.fog.near = 0.1; G.scene.fog.far = 18;
+        G.scene.fog.color.set(0x1a1a1a);
+        G.ren.setClearColor(0x1a1a1a);
+        G.sunLight.intensity = 0;
+        G.sunMesh.visible = false; G.moonMesh.visible = false;
+        G.ambLight.color.set(0x404050); G.ambLight.intensity = 0.25;
+        G.mazePlayerLight.intensity = 0.8;
+        for (var mi = 0; mi < G.mazeLights.length; mi++) G.mazeLights[mi].intensity = G.mazeLights[mi].userData.baseIntensity;
+        for (var mj = 0; mj < G.roomLights.length; mj++) G.roomLights[mj].intensity = G.roomLights[mj].userData.baseIntensity || 0.5;
+        G.cam.position.set(G.mpx, G.MAZE_Y + G.EYE, G.mpz);
+        if (G.audioOn) {
+          G.windGain.gain.setTargetAtTime(0, G.actx.currentTime, 0.1);
+          G.streamGain.gain.setTargetAtTime(0, G.actx.currentTime, 0.1);
+        }
+        initMazeAudio();
+      }
       // Show title
       var titleEl = document.getElementById('title');
       var subEl = document.getElementById('subtitle');
@@ -272,6 +302,14 @@ function animate() {
     updateTombstoneRing(t);
     updateTombstoneChat();
     updateGravestones();
+    updateNudge(dt);
+  }
+
+  // Auto-save every 30 seconds
+  if (!G._lastAutoSave) G._lastAutoSave = 0;
+  if (t - G._lastAutoSave > 30) {
+    G._lastAutoSave = t;
+    saveGame();
   }
 
   G.ren.render(G.scene, G.cam);

@@ -265,6 +265,13 @@ function tryInteract() {
 // ===================== MAZE TRANSITIONS =====================
 function transitionToMaze() {
   if (G.inMaze) return;
+  if (G.mazeGateActive) return;
+  // Layer B: check for repetitive death gate (only once per new death)
+  var deathCount = G.notebook.deaths.length;
+  if (deathCount >= 2 && deathCount !== G.mazeGateShownForDeathCount && checkRepetitiveDeath()) {
+    G.mazeGateShownForDeathCount = deathCount;
+    if (showMazeGate()) return;
+  }
   G.fadeEl.style.opacity = '1';
   setTimeout(function() {
     G.savedOutdoorPos.x = G.px;

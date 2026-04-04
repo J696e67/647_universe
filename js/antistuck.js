@@ -1,0 +1,153 @@
+'use strict';
+
+// ===================== ANTI-STUCK SYSTEM =====================
+// Layer A: Orientation nudges for new players spinning in place
+// Layer B: Maze gate when player dies the same way twice
+
+// --- Layer A: Orientation Phase ---
+var _nudge = {
+  triggered: false,
+  stage: 0,
+  timer: 0,
+  yawAccum: 0,
+  lastYaw: null,
+  msgs: [
+    '风从西边吹来。',
+    '地面上有个凹陷。',
+    '前人的墓碑在世界的边缘。'
+  ],
+  delays: [60, 30, 30]  // seconds between each message
+};
+
+function initAntiStuck() {
+  _nudge.triggered = false;
+  _nudge.stage = 0;
+  _nudge.timer = 0;
+  _nudge.yawAccum = 0;
+  _nudge.lastYaw = null;
+  G.mazeGateActive = false;
+  G.mazeGateShownForDeathCount = 0;  // tracks which death count the gate was last shown for
+  G.mazeGateEl = document.getElementById('maze-gate');
+}
+
+function updateNudge(dt) {
+  // Skip if already done, or player has entered maze/house/tombstone chat
+  if (_nudge.triggered) return;
+  if (G.inMaze) { _nudge.triggered = true; return; }
+  if (G.notebook.entries.length > 0) { _nudge.triggered = true; return; }
+
+  // Track yaw rotation accumulation
+  if (_nudge.lastYaw !== null) {
+    var dyaw = G.yaw - _nudge.lastYaw;
+    // Normalize to [-PI, PI]
+    while (dyaw > Math.PI) dyaw -= 2 * Math.PI;
+    while (dyaw < -Math.PI) dyaw += 2 * Math.PI;
+    _nudge.yawAccum += Math.abs(dyaw);
+  }
+  _nudge.lastYaw = G.yaw;
+
+  // Check if player is near spawn
+  var spawnDist = pDist(G.px, G.pz, 0, 8);
+  var nearSpawn = spawnDist < 15;
+
+  if (!nearSpawn) {
+    // Player is exploring, reset and mark done
+    _nudge.triggered = true;
+    return;
+  }
+
+  _nudge.timer += dt;
+
+  // Trigger conditions: near spawn + enough time passed for current stage
+  if (_nudge.stage < _nudge.msgs.length && _nudge.timer >= _nudge.delays[_nudge.stage]) {
+    showNudgeMsg(_nudge.msgs[_nudge.stage]);
+    _nudge.timer = 0;
+    _nudge.stage++;
+    if (_nudge.stage >= _nudge.msgs.length) {
+      _nudge.triggered = true;
+    }
+  }
+}
+
+function showNudgeMsg(text) {
+  var el = document.getElementById('nudge-text');
+  el.textContent = text;
+  el.style.opacity = '1';
+  setTimeout(function() { el.style.opacity = '0'; }, 5000);
+}
+
+
+// --- Layer B: Repetitive Death Gate ---
+
+function checkRepetitiveDeath() {
+  var deaths = G.notebook.deaths;
+  if (deaths.length < 2) return false;
+
+  var last = deaths[deaths.length - 1];
+  var prev = deaths[deaths.length - 2];
+
+  // Same cause?
+  if (last.causeId !== prev.causeId) return false;
+
+  // Similar action sequence? (>= 60% overlap in order)
+  var overlap = 0;
+  var maxLen = Math.max(last.lastActions.length, prev.lastActions.length);
+  if (maxLen === 0) return false;
+
+  for (var i = 0; i < Math.min(last.lastActions.length, prev.lastActions.length); i++) {
+    if (last.lastActions[i] === prev.lastActions[i]) overlap++;
+  }
+
+  return (overlap / maxLen) >= 0.6;
+}
+
+function getGateQuestion() {
+  var deaths = G.notebook.deaths;
+  if (deaths.length < 2) return null;
+
+  var last = deaths[deaths.length - 1];
+  var causeId = last.causeId || '';
+
+  // Pick question based on cause
+  if (causeId === 'kcn_ingestion') {
+    return '上一位尝了什么？\n你打算怎么做？';
+  }
+  if (causeId === 'cross_contamination_death') {
+    return '上一位碰过什么？你碰过什么？\n有什么不同吗？';
+  }
+
+  // Generic: same path twice
+  var pool = [
+    '同样的路走两次，结果会不同吗？',
+    '上一位留下了什么痕迹？',
+    '迷宫记得你。它在等你注意到什么。'
+  ];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function showMazeGate() {
+  var question = getGateQuestion();
+  if (!question) return false;
+
+  G.mazeGateActive = true;
+  var el = G.mazeGateEl;
+  var qEl = document.getElementById('gate-question');
+  qEl.innerHTML = question.replace(/\n/g, '<br>');
+  el.classList.add('active');
+
+  // Auto-dismiss after 6 seconds, then enter maze
+  G._gateTimer = setTimeout(function() {
+    dismissMazeGate(true);
+  }, 6000);
+
+  return true;
+}
+
+function dismissMazeGate(enterMaze) {
+  clearTimeout(G._gateTimer);
+  G.mazeGateActive = false;
+  G.mazeGateEl.classList.remove('active');
+  if (enterMaze) {
+    transitionToMaze();
+  }
+}
