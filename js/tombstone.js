@@ -121,6 +121,7 @@ function sendTombstoneMsg(msg) {
       stream: true
     })
   }).then(function(res) {
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     var reader = res.body.getReader();
     var decoder = new TextDecoder();
     var fullResponse = '';
