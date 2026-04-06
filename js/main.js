@@ -76,6 +76,7 @@ var G = window.G = {
 
   // Substances & Surfaces (Phase 3)
   interactables: [],
+  berries: [],
   surfaceStates: {},
 
   // Effects (Phase 4)
@@ -287,6 +288,7 @@ function animate() {
   // Update effects (Phase 4)
   if (G.alive) updateEffects(dt);
 
+  updateBerryDecay();
   if (G.alive) {
     updateSenses();
     updateSmellProximity();

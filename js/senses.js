@@ -6,6 +6,13 @@ senseRaycaster.far = 5.0;
 var currentTarget = null;
 var actionMenuVisible = false;
 
+function getSenseProperty(obj, key) {
+  if (obj.userData.senseOverrides && obj.userData.senseOverrides[key])
+    return obj.userData.senseOverrides[key];
+  var sub = getSubstance(obj.userData.substanceId);
+  return sub ? sub.properties[key] : null;
+}
+
 function updateSenses() {
   if (!G.alive) { hideActionMenu(); return; }
 
@@ -96,8 +103,8 @@ function performAction(action, obj) {
 function doExamine(obj, char, name, room) {
   var text = '';
   if (obj.userData.type === 'substance') {
-    var sub = getSubstance(obj.userData.substanceId);
-    text = sub ? sub.properties.look.description : 'Nothing remarkable.';
+    var lp = getSenseProperty(obj, 'look');
+    text = lp ? lp.description : 'Nothing remarkable.';
   } else if (obj.userData.type === 'book') {
     text = 'A thin, worn book with dark red cover. Title: 《时间之外的往事》';
   } else if (obj.userData.type === 'surface') {
@@ -118,13 +125,14 @@ function doTouch(obj, char, name, room) {
   var result = '';
 
   if (obj.userData.type === 'substance') {
+    var tp = getSenseProperty(obj, 'touch');
     var sub = getSubstance(obj.userData.substanceId);
-    if (sub && sub.properties.touch) {
-      result = sub.properties.touch.description;
-      if (sub.properties.touch.residue && !hasGloves) {
+    if (tp) {
+      result = tp.description;
+      if (tp.residue && !hasGloves) {
         // Add contamination to character's hands
-        if (char.handContamination.indexOf(sub.properties.touch.residueId) === -1) {
-          char.handContamination.push(sub.properties.touch.residueId);
+        if (char.handContamination.indexOf(tp.residueId) === -1) {
+          char.handContamination.push(tp.residueId);
         }
         result += hasGloves ? '' : '';
       }
@@ -197,18 +205,25 @@ function doTaste(obj, char, name, room) {
 
   // No lethal hand contamination — proceed with substance taste
   if (obj.userData.type === 'substance') {
-    var sub = getSubstance(obj.userData.substanceId);
-    if (sub && sub.properties.taste) {
-      result = sub.properties.taste.description;
+    var tasteProp = getSenseProperty(obj, 'taste');
+    if (tasteProp) {
+      result = tasteProp.description;
       showMsg(result);
       addNotebookEntry('taste', name, room, result);
 
-      if (sub.properties.taste.lethal) {
+      // DECAYED berry → disintegrates, leave seed
+      if (obj.userData.isBerry && obj.userData.decayStage >= 4) {
+        currentTarget = null; hideActionMenu();
+        removeBerry(obj);
+      }
+
+      if (tasteProp.lethal) {
+        var sub = getSubstance(obj.userData.substanceId);
         triggerEffect({
-          effectId: sub.id + '_ingestion',
+          effectId: (sub ? sub.id : 'unknown') + '_ingestion',
           character: char.name,
           trigger: 'taste',
-          delay: sub.properties.taste.delay || 0,
+          delay: tasteProp.delay || 0,
           symptoms: [],
           lethal: true,
           deathMessage: char.name + ' collapsed.'
@@ -226,11 +241,12 @@ function doTaste(obj, char, name, room) {
 function doSmell(obj, char, name, room) {
   var result = '';
   if (obj.userData.type === 'substance') {
-    var sub = getSubstance(obj.userData.substanceId);
-    if (sub && sub.properties.smellClose) {
-      result = sub.properties.smellClose.description;
-    } else if (sub && sub.properties.smell) {
-      result = sub.properties.smell.description;
+    var sc = getSenseProperty(obj, 'smellClose');
+    var sp = getSenseProperty(obj, 'smell');
+    if (sc) {
+      result = sc.description;
+    } else if (sp) {
+      result = sp.description;
     } else {
       result = 'No particular smell.';
     }
@@ -248,8 +264,8 @@ function updateSmellProximity() {
   for (var i = 0; i < G.interactables.length; i++) {
     var obj = G.interactables[i];
     if (obj.userData.type !== 'substance') continue;
-    var sub = getSubstance(obj.userData.substanceId);
-    if (!sub || !sub.properties.smell) continue;
+    var smellProp = getSenseProperty(obj, 'smell');
+    if (!smellProp) continue;
 
     var pos = obj.position;
     var px = G.inMaze ? G.mpx : G.px;
@@ -258,12 +274,12 @@ function updateSmellProximity() {
     var dz = pz - pos.z; if (G.inMaze) dz -= G.MSIZE * Math.round(dz / G.MSIZE);
     var dist = Math.sqrt(dx*dx + dz*dz);
 
-    if (dist < sub.properties.smell.detectDistance) {
-      var key = sub.id + '_' + G.currentCharacter.name;
+    if (dist < smellProp.detectDistance) {
+      var key = obj.uuid + '_' + G.currentCharacter.name;
       var now = G.gameTime;
       if (!lastSmellAlert[key] || now - lastSmellAlert[key] > 30) {
         lastSmellAlert[key] = now;
-        showSmellMsg(sub.properties.smell.description);
+        showSmellMsg(smellProp.description);
         addNotebookEntry('smell (auto)', sub.name, obj.userData.room || 'Unknown', sub.properties.smell.description);
       }
     }

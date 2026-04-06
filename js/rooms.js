@@ -242,6 +242,7 @@ function createRoom1(center, y) {
   );
   stem.position.set(cx + 0.3, y + 0.84, cz - 0.1);
   G.scene.add(stem); G.roomMeshes.push(stem);
+  initBerryDecay(berryMesh, stem);
 
   // Door handle — metal cylinder on the south wall
   var wallZ = (ROOM_DEFS[0].cells.r2 + 1) * G.MCELL - G.MHALF;

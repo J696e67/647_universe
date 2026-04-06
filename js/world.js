@@ -229,6 +229,7 @@ function createHouse() {
   );
   hStem.position.set(mx - 0.5, gy + 0.80, mz - 1.7);
   G.scene.add(hStem);
+  initBerryDecay(hBerry, hStem);
 
   // Door lamp (outside, above door)
   var lampArm = new THREE.Mesh(
@@ -249,7 +250,7 @@ function createHouse() {
   );
   lampBulb.position.set(mx, gy + wh - 0.45, mz + wd/2 + 0.4);
   G.scene.add(lampBulb);
-  G.doorLight = new THREE.PointLight(0xffe0a0, 1.5, 15);
+  G.doorLight = new THREE.PointLight(0xffe0a0, 0.5, 8);
   G.doorLight.position.set(mx, gy + wh - 0.5, mz + wd/2 + 0.5);
   G.scene.add(G.doorLight);
 
@@ -482,10 +483,17 @@ function createEntrance() {
   var stoneMat = new THREE.MeshLambertMaterial({ color: 0x707070 });
   var pillarGeo = new THREE.CylinderGeometry(0.12, 0.18, 2, 6);
   var corners = [[-1.3,-1.3],[1.3,-1.3],[-1.3,1.3],[1.3,1.3]];
+  var glowMat = new THREE.MeshStandardMaterial({
+    color: 0x88aacc, emissive: 0x4488aa, emissiveIntensity: 0.6,
+    roughness: 0.4, metalness: 0.2
+  });
   for (var i = 0; i < 4; i++) {
-    var p = new THREE.Mesh(pillarGeo, stoneMat);
+    var p = new THREE.Mesh(pillarGeo, glowMat);
     p.position.set(corners[i][0], ey+1, corners[i][1]);
     G.scene.add(p);
+    var pLight = new THREE.PointLight(0x88aacc, 0.4, 6);
+    pLight.position.set(corners[i][0], ey+2.1, corners[i][1]);
+    G.scene.add(pLight);
   }
   var plat = new THREE.Mesh(new THREE.BoxGeometry(3, 0.15, 3), stoneMat);
   plat.position.set(0, ey-0.08, 0); G.scene.add(plat);
