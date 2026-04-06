@@ -197,8 +197,61 @@ function createHouse() {
   box(0.42, 0.5, 0.06, -0.8, 0.65, -0.59, fMat);
 
   var bMat = new THREE.MeshLambertMaterial({ color: 0x8B0000 });
-  box(0.22, 0.03, 0.16, -0.8, 0.735, -1.7, bMat);
+  var bookMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.03, 0.16), bMat);
+  bookMesh.position.set(mx - 0.8, gy + 0.735, mz - 1.7);
+  bookMesh.userData.interactable = true;
+  bookMesh.userData.type = 'book';
+  bookMesh.userData.name = '《时间之外的往事》';
+  bookMesh.userData.room = 'House - Table';
+  G.scene.add(bookMesh);
+  if (!G.interactables) G.interactables = [];
+  G.interactables.push(bookMesh);
   G.bookPos = new THREE.Vector3(mx-0.8, gy+0.735, mz-1.7);
+
+  // Red berry on table (right of book)
+  var hBerry = new THREE.Mesh(
+    new THREE.SphereGeometry(0.04, 8, 8),
+    new THREE.MeshStandardMaterial({ color: 0xCC2222, roughness: 0.6 })
+  );
+  hBerry.position.set(mx - 0.5, gy + 0.76, mz - 1.7);
+  hBerry.userData.interactable = true;
+  hBerry.userData.substanceId = 'red_berry';
+  hBerry.userData.type = 'substance';
+  hBerry.userData.name = 'Red Berry';
+  hBerry.userData.room = 'House - Table';
+  G.scene.add(hBerry);
+  if (!G.interactables) G.interactables = [];
+  G.interactables.push(hBerry);
+  G.houseBerryPos = new THREE.Vector3(mx - 0.5, gy + 0.76, mz - 1.7);
+  var hStem = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.005, 0.005, 0.04, 4),
+    new THREE.MeshStandardMaterial({ color: 0x336622, roughness: 0.8 })
+  );
+  hStem.position.set(mx - 0.5, gy + 0.80, mz - 1.7);
+  G.scene.add(hStem);
+
+  // Door lamp (outside, above door)
+  var lampArm = new THREE.Mesh(
+    new THREE.BoxGeometry(0.06, 0.06, 0.4),
+    new THREE.MeshLambertMaterial({ color: 0x333333 })
+  );
+  lampArm.position.set(mx, gy + wh - 0.15, mz + wd/2 + 0.2);
+  G.scene.add(lampArm);
+  var lampShade = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.1, 0.25, 0.18, 8, 1, true),
+    new THREE.MeshLambertMaterial({ color: 0x443322, side: THREE.DoubleSide })
+  );
+  lampShade.position.set(mx, gy + wh - 0.35, mz + wd/2 + 0.4);
+  G.scene.add(lampShade);
+  var lampBulb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.08, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffeebb })
+  );
+  lampBulb.position.set(mx, gy + wh - 0.45, mz + wd/2 + 0.4);
+  G.scene.add(lampBulb);
+  G.doorLight = new THREE.PointLight(0xffe0a0, 1.5, 15);
+  G.doorLight.position.set(mx, gy + wh - 0.5, mz + wd/2 + 0.5);
+  G.scene.add(G.doorLight);
 
   G.houseWallSegs = [
     { x1: mx-ww/2, z1: mz-wd/2-wt/2, x2: mx+ww/2, z2: mz-wd/2+wt/2 },

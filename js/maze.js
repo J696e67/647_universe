@@ -102,53 +102,47 @@ function buildMazeGeometry() {
     for (var r = 0; r < G.MROWS; r++) {
       for (var c = 0; c < G.MCOLS; c++) {
 
+        // ── H-wall: 3 faces (south, north, top), no end caps ──
         if (G.mazeH[r][c]) {
-          var hz  = (r+1)*G.MCELL - G.MHALF + oz;
-          var rD  = (r+1) % G.MROWS;
-          var cL  = (c-1+G.MCOLS) % G.MCOLS;
-          var cR  = (c+1) % G.MCOLS;
-          // Adjacent collinear walls?
-          var adjL = G.mazeH[r][cL];
-          var adjR = G.mazeH[r][cR];
-          // Adjacent perpendicular walls at each end?
-          var perL = G.mazeV[r][cL] || G.mazeV[rD][cL];
-          var perR = G.mazeV[r][c]  || G.mazeV[rD][c];
-          // Natural boundaries — corner gaps filled by V-wall z-extension
-          var hx0 = c*G.MCELL     - G.MHALF + ox;
+          var hx0 = c*G.MCELL - G.MHALF + ox;
           var hx1 = (c+1)*G.MCELL - G.MHALF + ox;
-          // South face
-          addQuad(hx0,y0,hz-hw, hx1,y0,hz-hw, hx1,y1,hz-hw, hx0,y1,hz-hw,  0, 0,-1);
-          // North face
-          addQuad(hx1,y0,hz+hw, hx0,y0,hz+hw, hx0,y1,hz+hw, hx1,y1,hz+hw,  0, 0, 1);
-          // Top face
-          addQuad(hx0,y1,hz-hw, hx1,y1,hz-hw, hx1,y1,hz+hw, hx0,y1,hz+hw,  0, 1, 0);
-          // West end cap: only at genuine dead end (no collinear or perpendicular wall)
-          if (!adjL && !perL) addQuad(hx0,y0,hz-hw, hx0,y0,hz+hw, hx0,y1,hz+hw, hx0,y1,hz-hw, -1, 0, 0);
-          // East end cap
-          if (!adjR && !perR) addQuad(hx1,y0,hz+hw, hx1,y0,hz-hw, hx1,y1,hz-hw, hx1,y1,hz+hw,  1, 0, 0);
+          var hz  = (r+1)*G.MCELL - G.MHALF + oz;
+          addQuad(hx0,y0,hz-hw, hx1,y0,hz-hw, hx1,y1,hz-hw, hx0,y1,hz-hw, 0,0,-1);
+          addQuad(hx1,y0,hz+hw, hx0,y0,hz+hw, hx0,y1,hz+hw, hx1,y1,hz+hw, 0,0, 1);
+          addQuad(hx0,y1,hz-hw, hx1,y1,hz-hw, hx1,y1,hz+hw, hx0,y1,hz+hw, 0,1, 0);
         }
 
+        // ── V-wall: 3 faces (west, east, top), no end caps ──
         if (G.mazeV[r][c]) {
           var vx  = (c+1)*G.MCELL - G.MHALF + ox;
-          var rU  = (r-1+G.MROWS) % G.MROWS;
-          var cR2 = (c+1) % G.MCOLS;
-          var adjU = G.mazeV[rU][c];
-          var adjD = G.mazeV[(r+1)%G.MROWS][c];
-          var perT = G.mazeH[rU][c] || G.mazeH[rU][cR2];
-          var perB = G.mazeH[r][c]  || G.mazeH[r][cR2];
-          var vz0 = r*G.MCELL     - G.MHALF + oz - (perT ? hw : 0);
-          var vz1 = (r+1)*G.MCELL - G.MHALF + oz + (perB ? hw : 0);
-          // West face
-          addQuad(vx-hw,y0,vz1, vx-hw,y0,vz0, vx-hw,y1,vz0, vx-hw,y1,vz1, -1, 0, 0);
-          // East face
-          addQuad(vx+hw,y0,vz0, vx+hw,y0,vz1, vx+hw,y1,vz1, vx+hw,y1,vz0,  1, 0, 0);
-          // Top face
-          addQuad(vx-hw,y1,vz0, vx+hw,y1,vz0, vx+hw,y1,vz1, vx-hw,y1,vz1,  0, 1, 0);
-          // North end cap: only at genuine dead end
-          if (!adjU && !perT) addQuad(vx+hw,y0,vz0, vx-hw,y0,vz0, vx-hw,y1,vz0, vx+hw,y1,vz0,  0, 0,-1);
-          // South end cap
-          if (!adjD && !perB) addQuad(vx-hw,y0,vz1, vx+hw,y0,vz1, vx+hw,y1,vz1, vx-hw,y1,vz1,  0, 0, 1);
+          var vz0 = r*G.MCELL - G.MHALF + oz;
+          var vz1 = (r+1)*G.MCELL - G.MHALF + oz;
+          addQuad(vx-hw,y0,vz1, vx-hw,y0,vz0, vx-hw,y1,vz0, vx-hw,y1,vz1, -1,0,0);
+          addQuad(vx+hw,y0,vz0, vx+hw,y0,vz1, vx+hw,y1,vz1, vx+hw,y1,vz0,  1,0,0);
+          addQuad(vx-hw,y1,vz0, vx+hw,y1,vz0, vx+hw,y1,vz1, vx-hw,y1,vz1,  0,1,0);
         }
+
+        // ── Grid-point driven corner ──
+        // Analyze intersection at bottom-right of cell (r,c).
+        // 4 possible walls radiating from this point:
+        var pCR = (c+1) % G.MCOLS, pRD = (r+1) % G.MROWS;
+        var wL = G.mazeH[r][c];           // west
+        var wR = G.mazeH[r][pCR];         // east
+        var wU = G.mazeV[r][c];           // south (lower z)
+        var wD = G.mazeV[pRD][c];         // north (higher z)
+        if (!wL && !wR && !wU && !wD) continue;
+        // Straight-through: two collinear walls, no turn → walls already seamless
+        if (wL && wR && !wU && !wD) continue;
+        if (wU && wD && !wL && !wR) continue;
+        // All other cases (L / T / + / dead-end): render corner block.
+        // Only faces toward open directions (no wall) are rendered.
+        var px = (c+1)*G.MCELL - G.MHALF + ox;
+        var pz = (r+1)*G.MCELL - G.MHALF + oz;
+        if (!wU) addQuad(px-hw,y0,pz-hw, px+hw,y0,pz-hw, px+hw,y1,pz-hw, px-hw,y1,pz-hw, 0,0,-1);
+        if (!wD) addQuad(px+hw,y0,pz+hw, px-hw,y0,pz+hw, px-hw,y1,pz+hw, px+hw,y1,pz+hw, 0,0, 1);
+        if (!wL) addQuad(px-hw,y0,pz+hw, px-hw,y0,pz-hw, px-hw,y1,pz-hw, px-hw,y1,pz+hw, -1,0,0);
+        if (!wR) addQuad(px+hw,y0,pz-hw, px+hw,y0,pz+hw, px+hw,y1,pz+hw, px+hw,y1,pz-hw,  1,0,0);
+        addQuad(px-hw,y1,pz-hw, px+hw,y1,pz-hw, px+hw,y1,pz+hw, px-hw,y1,pz+hw, 0,1,0);
 
       }
     }
@@ -236,6 +230,19 @@ function createMazeLights() {
   );
   marker.position.set(2, G.MAZE_Y + 0.02, 2);
   G.scene.add(marker);
+
+  // Entrance light pillar
+  var pillarGeo = new THREE.CylinderGeometry(0.15, 0.35, G.MAZE_WALL_H, 12, 1, true);
+  var pillarMat = new THREE.MeshBasicMaterial({
+    color: 0x88ccaa, transparent: true, opacity: 0.18,
+    side: THREE.DoubleSide, depthWrite: false
+  });
+  var pillar = new THREE.Mesh(pillarGeo, pillarMat);
+  pillar.position.set(2, G.MAZE_Y + G.MAZE_WALL_H / 2, 2);
+  G.scene.add(pillar);
+  var pillarLight = new THREE.PointLight(0x88ccaa, 0.6, 8);
+  pillarLight.position.set(2, G.MAZE_Y + 0.5, 2);
+  G.scene.add(pillarLight);
 }
 
 // ===================== MAZE COLLISION =====================

@@ -223,7 +223,8 @@ function init() {
       if (G._pendingMazeRestore) {
         delete G._pendingMazeRestore;
         G.inMaze = true;
-        G.mazeExitReady = true;
+        G.mazeExitReady = false;
+        G.mpx = 2; G.mpz = 2;
         G.scene.fog.near = 0.1; G.scene.fog.far = 18;
         G.scene.fog.color.set(0x1a1a1a);
         G.ren.setClearColor(0x1a1a1a);
@@ -286,13 +287,13 @@ function animate() {
   // Update effects (Phase 4)
   if (G.alive) updateEffects(dt);
 
+  if (G.alive) {
+    updateSenses();
+    updateSmellProximity();
+  }
   if (G.inMaze) {
     updatePlayerMaze(dt);
     updateMaze(t);
-    if (G.alive) {
-      updateSenses();
-      updateSmellProximity();
-    }
   } else {
     updatePlayer(dt);
     updateDayNight(t + G.TIME_OFFSET);

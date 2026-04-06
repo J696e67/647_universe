@@ -7,7 +7,7 @@ var currentTarget = null;
 var actionMenuVisible = false;
 
 function updateSenses() {
-  if (!G.inMaze || !G.alive) { hideActionMenu(); return; }
+  if (!G.alive) { hideActionMenu(); return; }
 
   // Cast ray from camera
   var dir = new THREE.Vector3(0, 0, -1);
@@ -61,6 +61,10 @@ function hideActionMenu() {
 function getAvailableActions(obj) {
   var actions = [];
   actions.push({ label: 'Examine', action: 'examine' });
+  if (obj.userData.type === 'book') {
+    actions.push({ label: 'Read', action: 'read' });
+    return actions;
+  }
   actions.push({ label: 'Touch', action: 'touch' });
 
   if (obj.userData.type === 'substance') {
@@ -83,6 +87,7 @@ function performAction(action, obj) {
   var room = obj.userData.room || 'Unknown';
 
   if (action === 'examine') doExamine(obj, char, name, room);
+  else if (action === 'read') doRead(obj, char, name, room);
   else if (action === 'touch') doTouch(obj, char, name, room);
   else if (action === 'taste') doTaste(obj, char, name, room);
   else if (action === 'smell') doSmell(obj, char, name, room);
@@ -93,11 +98,19 @@ function doExamine(obj, char, name, room) {
   if (obj.userData.type === 'substance') {
     var sub = getSubstance(obj.userData.substanceId);
     text = sub ? sub.properties.look.description : 'Nothing remarkable.';
+  } else if (obj.userData.type === 'book') {
+    text = 'A thin, worn book with dark red cover. Title: 《时间之外的往事》';
   } else if (obj.userData.type === 'surface') {
     text = 'A metal ' + name.toLowerCase() + '. It looks ordinary.';
   }
   showMsg(text);
   addNotebookEntry('examine', name, room, text);
+}
+
+function doRead(obj, char, name, room) {
+  var text = '我们度过的，都只是时间之外的往事。\n\n—— 《时间之外的往事》';
+  showMsg(text);
+  addNotebookEntry('read', name, room, text);
 }
 
 function doTouch(obj, char, name, room) {
@@ -230,7 +243,7 @@ function doSmell(obj, char, name, room) {
 var lastSmellAlert = {};
 
 function updateSmellProximity() {
-  if (!G.inMaze || !G.alive) return;
+  if (!G.alive) return;
 
   for (var i = 0; i < G.interactables.length; i++) {
     var obj = G.interactables[i];
@@ -239,8 +252,10 @@ function updateSmellProximity() {
     if (!sub || !sub.properties.smell) continue;
 
     var pos = obj.position;
-    var dx = G.mpx - pos.x; dx -= G.MSIZE * Math.round(dx / G.MSIZE);
-    var dz = G.mpz - pos.z; dz -= G.MSIZE * Math.round(dz / G.MSIZE);
+    var px = G.inMaze ? G.mpx : G.px;
+    var pz = G.inMaze ? G.mpz : G.pz;
+    var dx = px - pos.x; if (G.inMaze) dx -= G.MSIZE * Math.round(dx / G.MSIZE);
+    var dz = pz - pos.z; if (G.inMaze) dz -= G.MSIZE * Math.round(dz / G.MSIZE);
     var dist = Math.sqrt(dx*dx + dz*dz);
 
     if (dist < sub.properties.smell.detectDistance) {

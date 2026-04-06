@@ -246,20 +246,14 @@ function tryInteract() {
   if (G.inMaze && G.mazeExitReady && Math.sqrt((G.mpx-2)*(G.mpx-2)+(G.mpz-2)*(G.mpz-2)) < 3) {
     transitionToOutdoor(); return;
   }
-  // Book
-  if (!G.inMaze && G.bookPos && pDist(G.px, G.pz, G.bookPos.x, G.bookPos.z) < 2.5) {
-    showMsg('我们度过的，都只是时间之外的往事。\n\n—— 《时间之外的往事》');
-    return;
-  }
+  // Book & house objects — handled by senses raycaster now
   // Tombstone — focus chat
   if (!G.inMaze && G.tombPos && pDist(G.px, G.pz, G.tombPos.x, G.tombPos.z) < 5) {
     document.getElementById('chat-in').focus();
     return;
   }
-  // Senses interaction (Phase 3) — in maze
-  if (G.inMaze) {
-    trySenseInteract();
-  }
+  // Senses interaction (Phase 3)
+  trySenseInteract();
 }
 
 // ===================== MAZE TRANSITIONS =====================

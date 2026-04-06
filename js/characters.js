@@ -49,7 +49,7 @@ function respawnCharacter() {
 
   // Spawn at house entrance
   G.px = G.HSE_X; G.pz = G.HSE_Z + 4;
-  G.yaw = -0.3;
+  G.yaw = Math.PI / 2;
   var gy = groundH(G.px, G.pz);
   G.cam.position.set(G.px, gy + G.EYE, G.pz);
 
