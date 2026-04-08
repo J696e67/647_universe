@@ -43,7 +43,11 @@ function showActionMenu(obj) {
   var menu = document.getElementById('action-menu');
   menu.innerHTML = '';
   var actions = getAvailableActions(obj);
-  for (var i = 0; i < actions.length; i++) {
+  var n = actions.length;
+  var radius = ('ontouchstart' in window) ? 90 : 80;
+  // Start from top (-90°), distribute evenly
+  var startAngle = -Math.PI / 2;
+  for (var i = 0; i < n; i++) {
     var btn = document.createElement('button');
     btn.textContent = actions[i].label;
     btn.dataset.action = actions[i].action;
@@ -53,6 +57,9 @@ function showActionMenu(obj) {
         performAction(action, target);
       };
     })(actions[i].action, obj));
+    var angle = startAngle + (2 * Math.PI / n) * i;
+    btn.style.left = Math.round(Math.cos(angle) * radius) + 'px';
+    btn.style.top = Math.round(Math.sin(angle) * radius) + 'px';
     menu.appendChild(btn);
   }
   menu.classList.add('active');

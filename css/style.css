@@ -57,20 +57,20 @@ canvas { display: block; }
   color: rgba(255,255,255,0.3); font-size: 1.2em; font-family: monospace;
   pointer-events: none; z-index: 5; opacity: 0; transition: opacity 0.3s; }
 
-/* Action Menu */
-#action-menu { position: fixed; bottom: 18%; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 8px; z-index: 6; opacity: 0; transition: opacity 0.3s;
-  pointer-events: none; }
+/* Action Menu — radial layout around crosshair */
+#action-menu { position: fixed; top: 50%; left: 50%; width: 0; height: 0;
+  z-index: 6; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
 #action-menu.active { opacity: 1; pointer-events: auto; }
-#action-menu button { padding: 6px 16px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 16px; color: #ddd; font-size: 0.85em; cursor: pointer;
-  font-family: sans-serif; backdrop-filter: blur(4px); transition: background 0.2s; }
+#action-menu button { position: absolute; padding: 6px 14px; background: rgba(0,0,0,0.65);
+  border: 1px solid rgba(255,255,255,0.25); border-radius: 16px; color: #ddd;
+  font-size: 0.8em; cursor: pointer; font-family: sans-serif;
+  backdrop-filter: blur(4px); transition: background 0.2s;
+  white-space: nowrap; transform: translate(-50%, -50%); }
 #action-menu button:hover { background: rgba(255,255,255,0.15); }
 #action-menu button:active { background: rgba(255,255,255,0.25); }
 @media (pointer: coarse) {
-  #action-menu button { padding: 10px 20px; font-size: 1em; min-width: 60px; }
-  #action-menu { gap: 10px; bottom: 12%; }
-  #text { bottom: 28%; }
+  #action-menu button { padding: 10px 18px; font-size: 1em; }
+  #text { bottom: 8%; }
 }
 
 /* Notebook Button */
