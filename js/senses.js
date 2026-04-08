@@ -67,7 +67,8 @@ function hideActionMenu() {
 
 function getAvailableActions(obj) {
   var actions = [];
-  actions.push({ label: 'Examine', action: 'examine' });
+  actions.push({ label: 'Look', action: 'look' });
+  actions.push({ label: 'Listen', action: 'listen' });
   if (obj.userData.type === 'book') {
     actions.push({ label: 'Read', action: 'read' });
     return actions;
@@ -93,25 +94,40 @@ function performAction(action, obj) {
   var name = obj.userData.name;
   var room = obj.userData.room || 'Unknown';
 
-  if (action === 'examine') doExamine(obj, char, name, room);
+  if (action === 'look') doLook(obj, char, name, room);
+  else if (action === 'listen') doListen(obj, char, name, room);
   else if (action === 'read') doRead(obj, char, name, room);
   else if (action === 'touch') doTouch(obj, char, name, room);
   else if (action === 'taste') doTaste(obj, char, name, room);
   else if (action === 'smell') doSmell(obj, char, name, room);
 }
 
-function doExamine(obj, char, name, room) {
+function doLook(obj, char, name, room) {
   var text = '';
   if (obj.userData.type === 'substance') {
     var lp = getSenseProperty(obj, 'look');
     text = lp ? lp.description : 'Nothing remarkable.';
   } else if (obj.userData.type === 'book') {
-    text = 'A thin, worn book with dark red cover. Title: 《时间之外的往事》';
+    text = 'A thin, worn book with a dark red cover. The binding is cracked and the pages are yellowed. Title: 《时间之外的往事》';
   } else if (obj.userData.type === 'surface') {
-    text = 'A metal ' + name.toLowerCase() + '. It looks ordinary.';
+    text = 'A metal ' + name.toLowerCase() + '. The surface has a dull sheen, with faint scratches from use.';
   }
   showMsg(text);
-  addNotebookEntry('examine', name, room, text);
+  addNotebookEntry('look', name, room, text);
+}
+
+function doListen(obj, char, name, room) {
+  var text = '';
+  if (obj.userData.type === 'substance') {
+    var lp = getSenseProperty(obj, 'listen');
+    text = lp ? lp.description : 'Silence.';
+  } else if (obj.userData.type === 'book') {
+    text = 'You hold it to your ear. Silence — just the faintest creak of old binding.';
+  } else if (obj.userData.type === 'surface') {
+    text = 'You press your ear close. A faint metallic resonance, then nothing.';
+  }
+  showMsg(text);
+  addNotebookEntry('listen', name, room, text);
 }
 
 function doRead(obj, char, name, room) {

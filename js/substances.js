@@ -14,6 +14,7 @@ function initSubstances() {
         taste: { lethal: true, delay: 0, description: 'Intensely bitter.' },
         touch: { residue: true, residueId: 'kcn_residue', description: 'Fine crystalline powder clings to your fingers.' },
         look: { description: 'Fine white crystalline powder. It catches the light slightly.' },
+        listen: { description: 'Silence. The powder sits perfectly still.' },
         smellClose: { description: 'A distinct bitter almond scent.' }
       },
       facts: {
@@ -40,6 +41,7 @@ function initSubstances() {
         taste: { lethal: false, delay: 0, description: 'Sweet and slightly tart. Harmless.' },
         touch: { residue: false, description: 'Smooth, slightly yielding skin.' },
         look: { description: 'A small, round red berry with a thin stem. Appears ripe.' },
+        listen: { description: 'Silence. Just a tiny, living thing sitting still.' },
         smellClose: { description: 'Sweet, fruity aroma. Smells like a common berry.' }
       },
       facts: {
@@ -57,6 +59,7 @@ function initSubstances() {
         taste: { lethal: false, delay: 0, description: 'Hard and bitter. Not edible.' },
         touch: { residue: false, description: 'A small, hard seed. Smooth and oval-shaped.' },
         look: { description: 'A tiny dark seed, left behind by a decayed berry.' },
+        listen: { description: 'Silence. A dead husk holds nothing to say.' },
         smellClose: { description: 'Earthy, with a hint of old fruit.' }
       },
       facts: { name: 'Berry Seed', lethality: 'Non-toxic', mechanism: 'N/A' }
@@ -73,30 +76,35 @@ var BERRY_DECAY = [
   { name:'FRESH', t0:0, t1:360,
     color:0xCC2222, scale:1.0, stemColor:0x336622, dist:0.5,
     look:'A small, round red berry with a thin green stem. Appears perfectly ripe.',
+    listen:'Silence. Just a tiny, living thing sitting still.',
     smell:'A faint fruity aroma.', smellClose:'Sweet, fruity aroma. Smells like a common berry.',
     taste:'Sweet and slightly tart. Juicy and fresh.',
     touch:'Smooth, firm skin with a slight give.' },
   { name:'OVERRIPE', t0:360, t1:720,
     color:0x991133, scale:0.95, stemColor:0x667722, dist:1.0,
     look:'A darkening red berry. The skin is slightly wrinkled, past its prime.',
+    listen:'A faint, wet creak — the skin shifting as it softens.',
     smell:'A sweet, cloying fruity scent.', smellClose:'Overly sweet aroma with a hint of fermentation.',
     taste:'Very sweet, almost syrupy. Slightly mushy.',
     touch:'Soft skin that yields easily under pressure.' },
   { name:'FERMENTING', t0:720, t1:1080,
     color:0x774422, scale:0.85, stemColor:0x998833, dist:1.8,
     look:'A brown-red berry with wrinkled, darkened skin. Small droplets on the surface.',
+    listen:'Tiny bubbles pop beneath the skin. A faint fizzing.',
     smell:'A pungent, fermenting odor.', smellClose:'Sharp alcoholic tang mixed with rotting fruit.',
     taste:'Sour and fizzy. Unpleasant.',
     touch:'Mushy and damp. The skin tears easily.' },
   { name:'ROTTING', t0:1080, t1:1440,
     color:0x332211, scale:0.65, stemColor:0x553311, dist:2.5,
     look:'A shriveled dark mass, barely recognizable as a berry. White fuzzy mold is forming.',
+    listen:'A soft, wet squelch. Something is alive inside — microbes at work.',
     smell:'A putrid, rotting stench.', smellClose:'Overwhelming decay. Your stomach turns.',
     taste:'Vile. You gag involuntarily.',
     touch:'Cold, slimy mush. It collapses in your fingers.' },
   { name:'DECAYED', t0:1440, t1:Infinity,
     color:0x111111, scale:0.5, stemColor:0x221100, dist:3.0,
     look:'A tiny blackened husk. Only the seed inside remains.',
+    listen:'Silence. A dry husk holds nothing but a seed.',
     smell:'The stench of decay and damp soil.', smellClose:'Earthy decay, like compost.',
     taste:'A gritty, foul slime disintegrates in your mouth. A hard seed remains.',
     touch:'Dry, crumbling remains. A hard seed rolls free.' }
@@ -123,6 +131,7 @@ function initBerryDecay(mesh, stemMesh) {
   mesh.userData.contamination = [];      // residue deposited on berry surface
   mesh.userData.senseOverrides = {
     look: { description: BERRY_DECAY[0].look },
+    listen: { description: BERRY_DECAY[0].listen },
     smell: { description: BERRY_DECAY[0].smell, detectDistance: BERRY_DECAY[0].dist },
     smellClose: { description: BERRY_DECAY[0].smellClose },
     taste: { lethal: false, delay: 0, description: BERRY_DECAY[0].taste },
@@ -172,6 +181,7 @@ function updateBerryDecay() {
       m.userData.decayStage = si;
       var ov = m.userData.senseOverrides;
       ov.look.description = stg.look;
+      ov.listen.description = stg.listen;
       ov.smell.description = stg.smell;
       ov.smell.detectDistance = stg.dist;
       ov.smellClose.description = stg.smellClose;
