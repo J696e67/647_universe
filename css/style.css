@@ -67,6 +67,11 @@ canvas { display: block; }
   font-family: sans-serif; backdrop-filter: blur(4px); transition: background 0.2s; }
 #action-menu button:hover { background: rgba(255,255,255,0.15); }
 #action-menu button:active { background: rgba(255,255,255,0.25); }
+@media (pointer: coarse) {
+  #action-menu button { padding: 10px 20px; font-size: 1em; min-width: 60px; }
+  #action-menu { gap: 10px; bottom: 12%; }
+  #text { bottom: 28%; }
+}
 
 /* Notebook Button */
 #notebook-btn { position: fixed; top: 12px; right: 16px; font-size: 1.4em; cursor: pointer;

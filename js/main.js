@@ -38,7 +38,9 @@ var G = window.G = {
 
   // Input state
   keys: {},
-  touch: { on: false, sx: 0, sy: 0, cx: 0, cy: 0, t0: 0 },
+  touch: { on: false, moveId: null, lookId: null,
+    msx: 0, msy: 0, mcx: 0, mcy: 0,
+    lsx: 0, lsy: 0, lcx: 0, lcy: 0, llx: 0, lly: 0, lt0: 0 },
   pointerLocked: false,
 
   // Sky refs
@@ -265,7 +267,7 @@ function init() {
           // Show hint
           if (!G.hintShown) {
             var isMobile = 'ontouchstart' in window;
-            G.hintEl.textContent = isMobile ? '触摸屏幕开始漫步' : '点击进入，WASD移动，鼠标转向';
+            G.hintEl.textContent = isMobile ? '左侧拖动移动，右侧拖动转向，轻点互动' : '点击进入，WASD移动，鼠标转向';
             G.hintEl.style.opacity = '1';
             setTimeout(function() { G.hintEl.style.opacity = '0'; G.hintShown = true; }, 5000);
           }

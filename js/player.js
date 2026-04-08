@@ -64,32 +64,71 @@ function setupControls() {
     if (!G.audioOn) initAudio();
   });
 
-  // Touch
+  // Touch — split screen: left 40% = movement, right 60% = camera + interact
+  G.touch.moveId = null;  // track left-side touch
+  G.touch.lookId = null;  // track right-side touch
+
   G.ren.domElement.addEventListener('touchstart', function(e) {
     e.preventDefault();
-    var t = e.touches[0];
-    G.touch.on = true;
-    G.touch.sx = G.touch.cx = G.touch.lx = t.clientX;
-    G.touch.sy = G.touch.cy = G.touch.ly = t.clientY;
-    G.touch.t0 = Date.now();
     if (!G.audioOn) initAudio();
     if (!G.hintShown) { G.hintShown = true; G.hintEl.style.opacity = '0'; }
+    var boundary = window.innerWidth * 0.4;
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      var t = e.changedTouches[i];
+      if (t.clientX < boundary && G.touch.moveId === null) {
+        // Left side — movement
+        G.touch.moveId = t.identifier;
+        G.touch.msx = G.touch.mcx = t.clientX;
+        G.touch.msy = G.touch.mcy = t.clientY;
+      } else if (G.touch.lookId === null) {
+        // Right side — camera look
+        G.touch.lookId = t.identifier;
+        G.touch.lsx = G.touch.lcx = G.touch.llx = t.clientX;
+        G.touch.lsy = G.touch.lcy = G.touch.lly = t.clientY;
+        G.touch.lt0 = Date.now();
+      }
+    }
+    G.touch.on = (G.touch.moveId !== null || G.touch.lookId !== null);
   }, { passive: false });
 
   G.ren.domElement.addEventListener('touchmove', function(e) {
     e.preventDefault();
-    var t = e.touches[0];
-    G.touch.cx = t.clientX; G.touch.cy = t.clientY;
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      var t = e.changedTouches[i];
+      if (t.identifier === G.touch.moveId) {
+        G.touch.mcx = t.clientX; G.touch.mcy = t.clientY;
+      } else if (t.identifier === G.touch.lookId) {
+        G.touch.lcx = t.clientX; G.touch.lcy = t.clientY;
+      }
+    }
   }, { passive: false });
 
   G.ren.domElement.addEventListener('touchend', function(e) {
     e.preventDefault();
-    var dt = Date.now() - G.touch.t0;
-    var dx = Math.abs(G.touch.cx - G.touch.sx);
-    var dy = Math.abs(G.touch.cy - G.touch.sy);
-    if (dt < 500 && dx < 30 && dy < 30 && G.alive) tryInteract();
-    G.touch.on = false;
+    for (var i = 0; i < e.changedTouches.length; i++) {
+      var t = e.changedTouches[i];
+      if (t.identifier === G.touch.moveId) {
+        G.touch.moveId = null;
+      } else if (t.identifier === G.touch.lookId) {
+        // Tap detection on right side → interact
+        var dt = Date.now() - G.touch.lt0;
+        var dx = Math.abs(G.touch.lcx - G.touch.lsx);
+        var dy = Math.abs(G.touch.lcy - G.touch.lsy);
+        if (dt < 400 && dx < 20 && dy < 20 && G.alive) tryInteract();
+        G.touch.lookId = null;
+      }
+    }
+    G.touch.on = (G.touch.moveId !== null || G.touch.lookId !== null);
   }, { passive: false });
+
+  G.ren.domElement.addEventListener('touchcancel', function(e) {
+    G.touch.moveId = null; G.touch.lookId = null; G.touch.on = false;
+  }, { passive: false });
+
+  // Show crosshair on mobile
+  if ('ontouchstart' in window) {
+    document.getElementById('crosshair').style.opacity = '1';
+  }
 
   // Chat input
   var chatIn = document.getElementById('chat-in');
@@ -141,15 +180,19 @@ function updatePlayer(dt) {
     if (G.keys['KeyA'] || G.keys['ArrowLeft']) moveR -= 1;
     if (G.keys['KeyD'] || G.keys['ArrowRight']) moveR += 1;
   }
-  if (G.touch.on) {
+  // Mobile: left-side touch = walk forward (blocked by action menu)
+  if (G.touch.moveId !== null && !actionMenuVisible) {
     moveF = 1;
-    var tdx = G.touch.cx - G.touch.lx;
-    var tdy = G.touch.cy - G.touch.ly;
+  }
+  // Mobile: right-side touch = camera rotation (always allowed so user can look away to dismiss menu)
+  if (G.touch.lookId !== null) {
+    var tdx = G.touch.lcx - G.touch.llx;
+    var tdy = G.touch.lcy - G.touch.lly;
     G.yaw -= tdx * 0.004;
     G.pitch -= tdy * 0.003;
     G.pitch = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, G.pitch));
-    G.touch.lx = G.touch.cx;
-    G.touch.ly = G.touch.cy;
+    G.touch.llx = G.touch.lcx;
+    G.touch.lly = G.touch.lcy;
   }
 
   var sinY = Math.sin(G.yaw), cosY = Math.cos(G.yaw);
@@ -194,15 +237,19 @@ function updatePlayerMaze(dt) {
     if (G.keys['KeyA'] || G.keys['ArrowLeft']) moveR -= 1;
     if (G.keys['KeyD'] || G.keys['ArrowRight']) moveR += 1;
   }
-  if (G.touch.on && !actionMenuVisible) {
+  // Mobile: left-side touch = walk forward (blocked by action menu)
+  if (G.touch.moveId !== null && !actionMenuVisible) {
     moveF = 1;
-    var tdx = G.touch.cx - G.touch.lx;
-    var tdy = G.touch.cy - G.touch.ly;
+  }
+  // Mobile: right-side touch = camera rotation (always allowed so user can look away to dismiss menu)
+  if (G.touch.lookId !== null) {
+    var tdx = G.touch.lcx - G.touch.llx;
+    var tdy = G.touch.lcy - G.touch.lly;
     G.yaw -= tdx * 0.004;
     G.pitch -= tdy * 0.003;
     G.pitch = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, G.pitch));
-    G.touch.lx = G.touch.cx;
-    G.touch.ly = G.touch.cy;
+    G.touch.llx = G.touch.lcx;
+    G.touch.lly = G.touch.lcy;
   }
   var sinY = Math.sin(G.yaw), cosY = Math.cos(G.yaw);
   var nx = G.mpx + (-sinY * moveF + cosY * moveR) * G.SPD * dt;
