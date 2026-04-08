@@ -18,6 +18,12 @@ var G = window.G = {
   TMB_X: 99, TMB_Z: 0,
   WATER_Y: -0.25,
 
+  // Temperature (°C) — affects berry decay rate
+  TEMP_ABOVE: 26,   // above ground (house, outdoor)
+  TEMP_BELOW: 10,   // underground (maze)
+  DECAY_REF_TEMP: 20, // reference temperature for Q10 model
+  DECAY_Q10: 2,       // rate doubles per 10°C increase
+
   // Maze constants
   MCOLS: 16, MROWS: 16, MCELL: 4,
   MAZE_Y: -50, MAZE_WALL_H: 3.0,

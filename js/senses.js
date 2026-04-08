@@ -134,10 +134,25 @@ function doTouch(obj, char, name, room) {
         if (char.handContamination.indexOf(tp.residueId) === -1) {
           char.handContamination.push(tp.residueId);
         }
-        result += hasGloves ? '' : '';
       }
       if (hasGloves) {
         result = 'You touch it with gloved hands. ' + result;
+      }
+    }
+    // Transfer hand contamination onto this object's surface (silently)
+    if (!hasGloves && obj.userData.contamination) {
+      for (var ci = 0; ci < char.handContamination.length; ci++) {
+        var cid = char.handContamination[ci];
+        if (obj.userData.contamination.indexOf(cid) === -1) {
+          obj.userData.contamination.push(cid);
+        }
+      }
+      // Pick up existing contamination from object (silently)
+      for (var oi = 0; oi < obj.userData.contamination.length; oi++) {
+        var oid = obj.userData.contamination[oi];
+        if (char.handContamination.indexOf(oid) === -1) {
+          char.handContamination.push(oid);
+        }
       }
     }
   } else if (obj.userData.type === 'surface') {
@@ -168,14 +183,21 @@ function doTouch(obj, char, name, room) {
 }
 
 function doTaste(obj, char, name, room) {
-  // CHECK HAND CONTAMINATION FIRST — this is the core mechanic
-  var handContam = char.handContamination;
+  // Collect all contamination sources: hands + object surface
+  var allContam = char.handContamination.slice();
+  if (obj.userData.contamination) {
+    for (var k = 0; k < obj.userData.contamination.length; k++) {
+      if (allContam.indexOf(obj.userData.contamination[k]) === -1) {
+        allContam.push(obj.userData.contamination[k]);
+      }
+    }
+  }
   var result = '';
 
-  if (handContam.length > 0) {
-    // Player has residue on hands — check for lethal residue
-    for (var i = 0; i < handContam.length; i++) {
-      var residueSub = getSubstance(handContam[i]);
+  if (allContam.length > 0) {
+    // Check for lethal residue from hands or object surface
+    for (var i = 0; i < allContam.length; i++) {
+      var residueSub = getSubstance(allContam[i]);
       if (residueSub && residueSub.properties.taste && residueSub.properties.taste.lethal) {
         // Lethal cross-contamination!
         if (obj.userData.type === 'substance') {

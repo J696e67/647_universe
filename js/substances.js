@@ -104,11 +104,23 @@ var BERRY_DECAY = [
 
 var _bc1 = new THREE.Color(), _bc2 = new THREE.Color();
 
+function getBerryTemperature(mesh) {
+  // Underground (maze) vs above ground — determined by Y position
+  return mesh.position.y < G.MAZE_Y + G.MAZE_WALL_H ? G.TEMP_BELOW : G.TEMP_ABOVE;
+}
+
+function getDecayRate(temperature) {
+  // Q10 model: rate = Q10 ^ ((T - T_ref) / 10)
+  return Math.pow(G.DECAY_Q10, (temperature - G.DECAY_REF_TEMP) / 10);
+}
+
 function initBerryDecay(mesh, stemMesh) {
   mesh.userData.isBerry = true;
-  mesh.userData.spawnTime = G.gameTime;
   mesh.userData.stemMesh = stemMesh;
   mesh.userData.decayStage = 0;
+  mesh.userData.decayProgress = 0;       // accumulated decay units (temperature-adjusted)
+  mesh.userData.lastDecayTime = G.gameTime;
+  mesh.userData.contamination = [];      // residue deposited on berry surface
   mesh.userData.senseOverrides = {
     look: { description: BERRY_DECAY[0].look },
     smell: { description: BERRY_DECAY[0].smell, detectDistance: BERRY_DECAY[0].dist },
@@ -123,15 +135,25 @@ function updateBerryDecay() {
   for (var i = 0; i < G.berries.length; i++) {
     var m = G.berries[i];
     if (!m.parent) continue; // removed from scene
-    var age = G.gameTime - m.userData.spawnTime;
+
+    // Accumulate decay progress based on temperature
+    var dt = G.gameTime - m.userData.lastDecayTime;
+    m.userData.lastDecayTime = G.gameTime;
+    if (dt > 0) {
+      var temp = getBerryTemperature(m);
+      var rate = getDecayRate(temp);
+      m.userData.decayProgress += dt * rate;
+    }
+
+    var progress = m.userData.decayProgress;
     // find stage
     var si = 0;
     for (var j = BERRY_DECAY.length - 1; j >= 0; j--) {
-      if (age >= BERRY_DECAY[j].t0) { si = j; break; }
+      if (progress >= BERRY_DECAY[j].t0) { si = j; break; }
     }
     var stg = BERRY_DECAY[si];
     var nxt = BERRY_DECAY[Math.min(si + 1, BERRY_DECAY.length - 1)];
-    var t = (stg.t1 === Infinity) ? 0 : Math.min((age - stg.t0) / (stg.t1 - stg.t0), 1);
+    var t = (stg.t1 === Infinity) ? 0 : Math.min((progress - stg.t0) / (stg.t1 - stg.t0), 1);
 
     // interpolate color
     _bc1.set(stg.color); _bc2.set(nxt.color);
