@@ -74,21 +74,21 @@ function hideActionMenu() {
 
 function getAvailableActions(obj) {
   var actions = [];
-  actions.push({ label: 'Look', action: 'look' });
-  actions.push({ label: 'Listen', action: 'listen' });
+  actions.push({ label: L('action.look'), action: 'look' });
+  actions.push({ label: L('action.listen'), action: 'listen' });
   if (obj.userData.type === 'book') {
-    actions.push({ label: 'Read', action: 'read' });
+    actions.push({ label: L('action.read'), action: 'read' });
     return actions;
   }
-  actions.push({ label: 'Touch', action: 'touch' });
+  actions.push({ label: L('action.touch'), action: 'touch' });
 
   if (obj.userData.type === 'substance') {
     var sub = getSubstance(obj.userData.substanceId);
     if (sub && sub.properties.taste) {
-      actions.push({ label: 'Taste', action: 'taste' });
+      actions.push({ label: L('action.taste'), action: 'taste' });
     }
     if (sub && sub.properties.smell) {
-      actions.push({ label: 'Smell', action: 'smell' });
+      actions.push({ label: L('action.smell'), action: 'smell' });
     }
   }
   return actions;
@@ -98,8 +98,8 @@ function getAvailableActions(obj) {
 function performAction(action, obj) {
   if (!G.alive) return;
   var char = G.currentCharacter;
-  var name = obj.userData.name;
-  var room = obj.userData.room || 'Unknown';
+  var name = obj.userData.nameKey ? L(obj.userData.nameKey) : obj.userData.name;
+  var room = obj.userData.roomKey ? L(obj.userData.roomKey) : (obj.userData.room || 'Unknown');
 
   if (action === 'look') doLook(obj, char, name, room);
   else if (action === 'listen') doListen(obj, char, name, room);
@@ -113,34 +113,34 @@ function doLook(obj, char, name, room) {
   var text = '';
   if (obj.userData.type === 'substance') {
     var lp = getSenseProperty(obj, 'look');
-    text = lp ? lp.description : 'Nothing remarkable.';
+    text = lp ? lp.description : L('look.nothing');
   } else if (obj.userData.type === 'book') {
-    text = 'A thin, worn book with a dark red cover. The binding is cracked and the pages are yellowed. Title: 《时间之外的往事》';
+    text = L('look.book');
   } else if (obj.userData.type === 'surface') {
-    text = 'A metal ' + name.toLowerCase() + '. The surface has a dull sheen, with faint scratches from use.';
+    text = L('look.surface', {name: name});
   }
   showMsg(text);
-  addNotebookEntry('look', name, room, text);
+  addNotebookEntry(L('action.look'), name, room, text);
 }
 
 function doListen(obj, char, name, room) {
   var text = '';
   if (obj.userData.type === 'substance') {
     var lp = getSenseProperty(obj, 'listen');
-    text = lp ? lp.description : 'Silence.';
+    text = lp ? lp.description : L('listen.silence');
   } else if (obj.userData.type === 'book') {
-    text = 'You hold it to your ear. Silence — just the faintest creak of old binding.';
+    text = L('listen.book');
   } else if (obj.userData.type === 'surface') {
-    text = 'You press your ear close. A faint metallic resonance, then nothing.';
+    text = L('listen.surface');
   }
   showMsg(text);
-  addNotebookEntry('listen', name, room, text);
+  addNotebookEntry(L('action.listen'), name, room, text);
 }
 
 function doRead(obj, char, name, room) {
-  var text = '我们度过的，都只是时间之外的往事。\n\n—— 《时间之外的往事》';
+  var text = L('read.book');
   showMsg(text);
-  addNotebookEntry('read', name, room, text);
+  addNotebookEntry(L('action.read'), name, room, text);
 }
 
 function doTouch(obj, char, name, room) {
@@ -159,7 +159,7 @@ function doTouch(obj, char, name, room) {
         }
       }
       if (hasGloves) {
-        result = 'You touch it with gloved hands. ' + result;
+        result = L('touch.gloved') + result;
       }
     }
     // Transfer hand contamination onto this object's surface (silently)
@@ -181,7 +181,7 @@ function doTouch(obj, char, name, room) {
   } else if (obj.userData.type === 'surface') {
     var surfaceId = obj.userData.surfaceId;
     if (hasGloves) {
-      result = 'You touch the ' + name.toLowerCase() + ' with gloved hands.';
+      result = L('touch.surface_gloved', {name: name});
     } else {
       // Transfer hand contamination TO surface
       for (var i = 0; i < char.handContamination.length; i++) {
@@ -194,7 +194,7 @@ function doTouch(obj, char, name, room) {
           char.handContamination.push(surfContam[j].substanceId);
         }
       }
-      result = 'You touch the ' + name.toLowerCase() + '.';
+      result = L('touch.surface', {name: name});
       // Note: the player does NOT know they picked up residue
       if (char.handContamination.length > 0 && surfContam.length > 0) {
         // Secret: contamination transferred but not shown
@@ -202,7 +202,7 @@ function doTouch(obj, char, name, room) {
     }
   }
   showMsg(result);
-  addNotebookEntry('touch', name, room, result);
+  addNotebookEntry(L('action.touch'), name, room, result);
 }
 
 function doTaste(obj, char, name, room) {
@@ -225,12 +225,12 @@ function doTaste(obj, char, name, room) {
         // Lethal cross-contamination!
         if (obj.userData.type === 'substance') {
           var actualSub = getSubstance(obj.userData.substanceId);
-          result = actualSub ? actualSub.properties.taste.description : 'You taste it.';
+          result = actualSub ? actualSub.properties.taste.description : L('taste.fallback');
         } else {
-          result = 'You taste it.';
+          result = L('taste.fallback');
         }
         showMsg(result);
-        addNotebookEntry('taste', name, room, result);
+        addNotebookEntry(L('action.taste'), name, room, result);
         // Trigger death with delay
         triggerEffect({
           effectId: 'cross_contamination_death',
@@ -238,10 +238,10 @@ function doTaste(obj, char, name, room) {
           trigger: 'taste',
           delay: residueSub.properties.taste.delay || 2,
           symptoms: residueSub.properties.taste.delay > 0 ? [
-            { time: 1, type: 'text', msg: 'A strange taste lingers...' }
+            { time: 1, type: 'text', msg: L('taste.strange') }
           ] : [],
           lethal: true,
-          deathMessage: char.name + ' collapsed.'
+          deathMessage: L('death.collapsed', {name: char.name})
         });
         return;
       }
@@ -254,7 +254,7 @@ function doTaste(obj, char, name, room) {
     if (tasteProp) {
       result = tasteProp.description;
       showMsg(result);
-      addNotebookEntry('taste', name, room, result);
+      addNotebookEntry(L('action.taste'), name, room, result);
 
       // DECAYED berry → disintegrates, leave seed
       if (obj.userData.isBerry && obj.userData.decayStage >= 4) {
@@ -271,16 +271,16 @@ function doTaste(obj, char, name, room) {
           delay: tasteProp.delay || 0,
           symptoms: [],
           lethal: true,
-          deathMessage: char.name + ' collapsed.'
+          deathMessage: L('death.collapsed', {name: char.name})
         });
       }
       return;
     }
   }
 
-  result = 'You taste it. Nothing notable.';
+  result = L('taste.nothing');
   showMsg(result);
-  addNotebookEntry('taste', name, room, result);
+  addNotebookEntry(L('action.taste'), name, room, result);
 }
 
 function doSmell(obj, char, name, room) {
@@ -293,11 +293,11 @@ function doSmell(obj, char, name, room) {
     } else if (sp) {
       result = sp.description;
     } else {
-      result = 'No particular smell.';
+      result = L('smell.none');
     }
   }
   showMsg(result);
-  addNotebookEntry('smell', name, room, result);
+  addNotebookEntry(L('action.smell'), name, room, result);
 }
 
 // ===================== AUTOMATIC SMELL (Proximity) =====================
@@ -325,7 +325,7 @@ function updateSmellProximity() {
       if (!lastSmellAlert[key] || now - lastSmellAlert[key] > 30) {
         lastSmellAlert[key] = now;
         showSmellMsg(smellProp.description);
-        addNotebookEntry('smell (auto)', sub.name, obj.userData.room || 'Unknown', sub.properties.smell.description);
+        addNotebookEntry('smell (auto)', obj.userData.name, obj.userData.room || 'Unknown', smellProp.description);
       }
     }
   }

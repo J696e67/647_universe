@@ -201,8 +201,10 @@ function createHouse() {
   bookMesh.position.set(mx - 0.8, gy + 0.735, mz - 1.7);
   bookMesh.userData.interactable = true;
   bookMesh.userData.type = 'book';
-  bookMesh.userData.name = '《时间之外的往事》';
-  bookMesh.userData.room = 'House - Table';
+  bookMesh.userData.nameKey = 'obj.book';
+  bookMesh.userData.name = L('obj.book');
+  bookMesh.userData.roomKey = 'obj.house_table';
+  bookMesh.userData.room = L('obj.house_table');
   G.scene.add(bookMesh);
   if (!G.interactables) G.interactables = [];
   G.interactables.push(bookMesh);
@@ -217,8 +219,10 @@ function createHouse() {
   hBerry.userData.interactable = true;
   hBerry.userData.substanceId = 'red_berry';
   hBerry.userData.type = 'substance';
-  hBerry.userData.name = 'Red Berry';
-  hBerry.userData.room = 'House - Table';
+  hBerry.userData.nameKey = 'berry.name';
+  hBerry.userData.name = L('berry.name');
+  hBerry.userData.roomKey = 'obj.house_table';
+  hBerry.userData.room = L('obj.house_table');
   G.scene.add(hBerry);
   if (!G.interactables) G.interactables = [];
   G.interactables.push(hBerry);
@@ -230,6 +234,29 @@ function createHouse() {
   hStem.position.set(mx - 0.5, gy + 0.80, mz - 1.7);
   G.scene.add(hStem);
   initBerryDecay(hBerry, hStem);
+
+  // Ceiling lamp (inside house)
+  var ceilRod = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.015, 0.015, 0.5, 6),
+    new THREE.MeshLambertMaterial({ color: 0x444444 })
+  );
+  ceilRod.position.set(mx, gy + wh - 0.25, mz);
+  G.scene.add(ceilRod);
+  var ceilShade = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08, 0.3, 0.2, 8, 1, true),
+    new THREE.MeshLambertMaterial({ color: 0x554433, side: THREE.DoubleSide })
+  );
+  ceilShade.position.set(mx, gy + wh - 0.55, mz);
+  G.scene.add(ceilShade);
+  var ceilBulb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.06, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xfff5dd })
+  );
+  ceilBulb.position.set(mx, gy + wh - 0.63, mz);
+  G.scene.add(ceilBulb);
+  G.houseCeilLight = new THREE.PointLight(0xfff0cc, 0.8, 10);
+  G.houseCeilLight.position.set(mx, gy + wh - 0.65, mz);
+  G.scene.add(G.houseCeilLight);
 
   // Door lamp (outside, above door)
   var lampArm = new THREE.Mesh(

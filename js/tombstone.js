@@ -63,12 +63,12 @@ function updateTombstoneChat() {
     chatEl.classList.add('active');
     if (!G.tombChatInited) {
       G.tombChatInited = true;
-      appendChatMsg('ai', '647号宇宙\n\n把你们拿走的质量归还吧，只把记忆送往新宇宙。');
+      appendChatMsg('ai', L('tomb.greeting'));
     }
     if (!G.tombGreetingShown && G.currentCharacter) {
       G.tombGreetingShown = true;
       setTimeout(function() {
-        appendChatMsg('ai', 'What have you noticed about the world?');
+        appendChatMsg('ai', L('tomb.question'));
       }, 2000);
     }
   } else {
@@ -164,20 +164,13 @@ function sendTombstoneMsg(msg) {
   });
 }
 
-var OFFLINE_REPLIES = [
-  '你不是第一个站在这的。',
-  '我见过比你话多的，他死了，你还活着。',
-  '我记得每一个名字。',
-  '死亡不是终点，是启示。',
-  '不知道做什么的时候，也许可以看看前人的墓碑。'
-];
-
 function offlineFallback(msg) {
   var lower = msg.toLowerCase().replace(/\s+/g, '');
-  if (lower.indexOf('你是谁') !== -1 || lower.indexOf('who are you') !== -1 || lower.indexOf('whoareyou') !== -1) {
-    return '我是墓碑。';
+  if (lower.indexOf('你是谁') !== -1 || lower.indexOf('whoareyou') !== -1 || lower.indexOf('who are you') !== -1) {
+    return L('tomb.who');
   }
-  return OFFLINE_REPLIES[Math.floor(Math.random() * OFFLINE_REPLIES.length)];
+  var replies = [L('tomb.offline.0'), L('tomb.offline.1'), L('tomb.offline.2'), L('tomb.offline.3'), L('tomb.offline.4')];
+  return replies[Math.floor(Math.random() * replies.length)];
 }
 
 function formatNotebookForLLM() {

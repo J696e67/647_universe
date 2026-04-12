@@ -50,7 +50,7 @@ function renderNotebook(filterChar) {
 
   filters.innerHTML = '';
   var allBtn = document.createElement('button');
-  allBtn.textContent = 'All';
+  allBtn.textContent = L('notebook.all');
   allBtn.className = !filterChar ? 'active' : '';
   allBtn.addEventListener('click', function() { renderNotebook(); });
   filters.appendChild(allBtn);
@@ -65,7 +65,7 @@ function renderNotebook(filterChar) {
 
   // Leaderboard button
   var lbBtn = document.createElement('button');
-  lbBtn.textContent = '🏆 Leaderboard';
+  lbBtn.textContent = L('notebook.leaderboard');
   lbBtn.addEventListener('click', function() {
     document.getElementById('notebook-overlay').classList.remove('active');
     showLeaderboard();
@@ -74,11 +74,11 @@ function renderNotebook(filterChar) {
 
   // New Game button
   var newBtn = document.createElement('button');
-  newBtn.textContent = 'New Game';
+  newBtn.textContent = L('notebook.newgame');
   newBtn.style.color = '#cc4444';
   newBtn.style.marginLeft = 'auto';
   newBtn.addEventListener('click', function() {
-    if (confirm('Clear all progress and start a new game?')) {
+    if (confirm(L('notebook.confirm'))) {
       clearSave();
       location.reload();
     }
@@ -97,7 +97,7 @@ function renderNotebook(filterChar) {
     var deathTitle = document.createElement('div');
     deathTitle.style.color = '#cc4444';
     deathTitle.style.marginBottom = '8px';
-    deathTitle.textContent = '— Deaths (' + G.notebook.deaths.length + ') —';
+    deathTitle.textContent = L('notebook.deaths', {count: G.notebook.deaths.length});
     deathSection.appendChild(deathTitle);
 
     for (var d = 0; d < G.notebook.deaths.length; d++) {
@@ -107,7 +107,7 @@ function renderNotebook(filterChar) {
       dEl.className = 'nb-entry nb-death';
       dEl.innerHTML = '<span class="nb-char">' + death.characterName + '</span> — ' +
         death.message + ' <span class="nb-time">[' + formatTime(death.timestamp) + ', ' + death.location + ']</span>' +
-        '<br><span style="color:#884444;font-size:0.85em">Last actions: ' + death.lastActions.join(' → ') + '</span>';
+        '<br><span style="color:#884444;font-size:0.85em">' + L('notebook.lastactions') + death.lastActions.join(' \u2192 ') + '</span>';
       deathSection.appendChild(dEl);
     }
     content.appendChild(deathSection);
@@ -130,7 +130,7 @@ function renderNotebook(filterChar) {
   }
 
   if (entries.length === 0) {
-    content.innerHTML = '<div style="color:#555;text-align:center;padding:40px">No entries yet. Explore the maze and interact with objects.</div>';
+    content.innerHTML = '<div style="color:#555;text-align:center;padding:40px">' + L('notebook.empty') + '</div>';
   }
 }
 

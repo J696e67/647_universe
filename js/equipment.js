@@ -2,48 +2,13 @@
 
 // ===================== EQUIPMENT SYSTEM =====================
 var EQUIPMENT_DEFS = {
-  gloves: {
-    id: 'gloves',
-    name: 'Gloves',
-    description: 'Latex gloves. Prevent direct skin contact.',
-    effect: 'Blocks residue transfer when touching objects.'
-  },
-  'gas mask': {
-    id: 'gas_mask',
-    name: 'Gas Mask',
-    description: 'Respirator mask. Filters airborne substances.',
-    effect: 'Blocks inhalation effects.'
-  },
-  candle: {
-    id: 'candle',
-    name: 'Candle',
-    description: 'A simple candle. Flame requires oxygen.',
-    effect: 'Goes out in oxygen-depleted environments.'
-  },
-  'geiger counter': {
-    id: 'geiger_counter',
-    name: 'Geiger Counter',
-    description: 'Radiation detection device.',
-    effect: 'Clicks near radioactive sources.'
-  },
-  'wet cloth': {
-    id: 'wet_cloth',
-    name: 'Wet Cloth',
-    description: 'A damp cloth for wiping surfaces.',
-    effect: 'Can clean contamination from surfaces.'
-  },
-  'magnifying glass': {
-    id: 'magnifying_glass',
-    name: 'Magnifying Glass',
-    description: 'For close examination.',
-    effect: 'Reveals microscopic details.'
-  },
-  thermometer: {
-    id: 'thermometer',
-    name: 'Thermometer',
-    description: 'Measures temperature.',
-    effect: 'Shows ambient temperature in current area.'
-  }
+  gloves:           { id: 'gloves',           nameKey: 'equip.gloves',    descKey: 'equip.gloves.desc',    effectKey: 'equip.gloves.effect' },
+  'gas mask':       { id: 'gas_mask',         nameKey: 'equip.gas_mask',  descKey: 'equip.gas_mask.desc',  effectKey: 'equip.gas_mask.effect' },
+  candle:           { id: 'candle',           nameKey: 'equip.candle',    descKey: 'equip.candle.desc',    effectKey: 'equip.candle.effect' },
+  'geiger counter': { id: 'geiger_counter',   nameKey: 'equip.geiger',    descKey: 'equip.geiger.desc',    effectKey: 'equip.geiger.effect' },
+  'wet cloth':      { id: 'wet_cloth',        nameKey: 'equip.cloth',     descKey: 'equip.cloth.desc',     effectKey: 'equip.cloth.effect' },
+  'magnifying glass':{ id: 'magnifying_glass', nameKey: 'equip.magnifier', descKey: 'equip.magnifier.desc', effectKey: 'equip.magnifier.effect' },
+  thermometer:      { id: 'thermometer',      nameKey: 'equip.thermo',    descKey: 'equip.thermo.desc',    effectKey: 'equip.thermo.effect' }
 };
 
 function grantEquipment(itemName) {
@@ -65,13 +30,10 @@ function grantEquipment(itemName) {
     if (G.currentCharacter) {
       G.currentCharacter.equipment.push(normalized);
     }
-    showMsg('Received: ' + def.name + '\n' + def.effect, 5000);
-    addNotebookEntry('received equipment', def.name, 'Tombstone', def.effect);
-
-    // Special: wet cloth can clean surfaces
-    if (normalized === 'wet cloth') {
-      showMsg('Received: ' + def.name + '\nUse it to wipe contaminated surfaces.', 5000);
-    }
+    var eName = L(def.nameKey);
+    var eEffect = L(def.effectKey);
+    showMsg(L('equip.received', {name: eName, effect: eEffect}), 5000);
+    addNotebookEntry('received equipment', eName, 'Tombstone', eEffect);
   }
 }
 

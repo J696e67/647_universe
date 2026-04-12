@@ -103,7 +103,7 @@ function triggerDeath(message, causeId) {
 
   var nextName = G.characterNames[G.characterIndex + 1] || 'Explorer ' + (G.characterIndex + 2);
   setTimeout(function() {
-    deathNew.innerHTML = 'A new explorer arrives at Universe 647.<br><br><span style="font-size:1.2em;color:#e0d4b8">' + nextName + '</span>';
+    deathNew.innerHTML = L('death.new_explorer', {next: nextName});
     deathNew.style.opacity = '1';
   }, 3000);
 

@@ -4,7 +4,7 @@
 var DISCOVERIES = [
   {
     id: 'kcn_direct',
-    description: 'Identified KCN as cause of death by direct contact',
+    descKey: 'discovery.kcn',
     condition: function() {
       return G.notebook.tombstoneDialogue.some(function(d) {
         var dl = d.toLowerCase();
@@ -15,7 +15,7 @@ var DISCOVERIES = [
   },
   {
     id: 'cross_contamination',
-    description: 'Identified cross-contamination chain (residue → surface → next character)',
+    descKey: 'discovery.cross',
     condition: function() {
       return G.notebook.tombstoneDialogue.some(function(d) {
         var dl = d.toLowerCase();
@@ -27,7 +27,7 @@ var DISCOVERIES = [
   },
   {
     id: 'pbc_outer',
-    description: 'Discovered Universe 647 is a periodic boundary condition space',
+    descKey: 'discovery.pbc_outer',
     condition: function() {
       return G.notebook.tombstoneDialogue.some(function(d) {
         var dl = d.toLowerCase();
@@ -40,7 +40,7 @@ var DISCOVERIES = [
   },
   {
     id: 'pbc_inner',
-    description: 'Discovered the inner maze is also a PBC space',
+    descKey: 'discovery.pbc_inner',
     condition: function() {
       return G.notebook.tombstoneDialogue.some(function(d) {
         var dl = d.toLowerCase();
@@ -69,14 +69,14 @@ function checkLeaderboardConditions() {
       G.discoveredIds.push(disc.id);
       G.notebook.discoveries.push({
         id: disc.id,
-        description: disc.description,
+        description: L(disc.descKey),
         timestamp: G.gameTime,
         characterName: G.currentCharacter ? G.currentCharacter.name : 'Unknown'
       });
       // Save to localStorage
       try { localStorage.setItem('shennong_discoveries', JSON.stringify(G.discoveredIds)); } catch(e) {}
       // Show notification
-      showDiscoveryNotification(disc.description);
+      showDiscoveryNotification(L(disc.descKey));
     }
   }
 }
@@ -84,7 +84,7 @@ function checkLeaderboardConditions() {
 function showDiscoveryNotification(text) {
   var el = document.createElement('div');
   el.className = 'lb-discovery';
-  el.textContent = '✦ Discovery: ' + text;
+  el.textContent = L('discovery.prefix') + text;
   document.body.appendChild(el);
   setTimeout(function() { el.style.opacity = '1'; }, 100);
   setTimeout(function() {
@@ -104,13 +104,14 @@ function showLeaderboard() {
     var el = document.createElement('div');
     el.className = 'lb-entry';
 
+    var desc = L(disc.descKey);
     if (discovered) {
       var detail = G.notebook.discoveries.find(function(d) { return d.id === disc.id; });
-      el.innerHTML = '<span class="lb-check">✓</span>' + disc.description +
-        (detail ? '<br><span style="color:#666;font-size:0.8em">Discovered by ' +
-        detail.characterName + ' at ' + formatTime(detail.timestamp) + '</span>' : '');
+      el.innerHTML = '<span class="lb-check">\u2713</span>' + desc +
+        (detail ? '<br><span style="color:#666;font-size:0.8em">' + L('leaderboard.discovered_by') +
+        detail.characterName + ' @ ' + formatTime(detail.timestamp) + '</span>' : '');
     } else {
-      el.innerHTML = '<span class="lb-pending">○</span><span style="color:#555">' + disc.description + '</span>';
+      el.innerHTML = '<span class="lb-pending">\u25CB</span><span style="color:#555">' + desc + '</span>';
     }
     content.appendChild(el);
   }
@@ -122,9 +123,9 @@ function showLeaderboard() {
   stats.style.borderTop = '1px solid rgba(255,255,255,0.1)';
   stats.style.color = '#777';
   stats.style.fontSize = '0.85em';
-  stats.innerHTML = 'Total characters: ' + G.notebook.totalCharacters + '<br>' +
-    'Total deaths: ' + G.notebook.deaths.length + '<br>' +
-    'Discoveries: ' + G.discoveredIds.length + '/' + DISCOVERIES.length;
+  stats.innerHTML = L('leaderboard.total_chars') + G.notebook.totalCharacters + '<br>' +
+    L('leaderboard.total_deaths') + G.notebook.deaths.length + '<br>' +
+    L('leaderboard.discoveries') + G.discoveredIds.length + '/' + DISCOVERIES.length;
   content.appendChild(stats);
 
   overlay.classList.add('active');

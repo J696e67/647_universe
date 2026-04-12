@@ -200,8 +200,10 @@ function createRoom1(center, y) {
   kcnMesh.userData.interactable = true;
   kcnMesh.userData.substanceId = 'kcn';
   kcnMesh.userData.type = 'substance';
-  kcnMesh.userData.name = 'White Powder';
-  kcnMesh.userData.room = 'Room 1 - Chemistry Table';
+  kcnMesh.userData.nameKey = 'kcn.name';
+  kcnMesh.userData.name = L('kcn.name');
+  kcnMesh.userData.roomKey = 'obj.room1';
+  kcnMesh.userData.room = L('obj.room1');
   G.scene.add(kcnMesh);
   G.interactables.push(kcnMesh);
   G.roomMeshes.push(kcnMesh);
@@ -229,8 +231,10 @@ function createRoom1(center, y) {
   berryMesh.userData.interactable = true;
   berryMesh.userData.substanceId = 'red_berry';
   berryMesh.userData.type = 'substance';
-  berryMesh.userData.name = 'Red Berry';
-  berryMesh.userData.room = 'Room 1 - Chemistry Table';
+  berryMesh.userData.nameKey = 'berry.name';
+  berryMesh.userData.name = L('berry.name');
+  berryMesh.userData.roomKey = 'obj.room1';
+  berryMesh.userData.room = L('obj.room1');
   G.scene.add(berryMesh);
   G.interactables.push(berryMesh);
   G.roomMeshes.push(berryMesh);
@@ -255,8 +259,10 @@ function createRoom1(center, y) {
   handleMesh.userData.interactable = true;
   handleMesh.userData.type = 'surface';
   handleMesh.userData.surfaceId = 'room1_doorhandle';
-  handleMesh.userData.name = 'Door Handle';
-  handleMesh.userData.room = 'Room 1 - Chemistry Table';
+  handleMesh.userData.nameKey = 'obj.doorhandle';
+  handleMesh.userData.name = L('obj.doorhandle');
+  handleMesh.userData.roomKey = 'obj.room1';
+  handleMesh.userData.room = L('obj.room1');
   G.scene.add(handleMesh);
   G.interactables.push(handleMesh);
   G.roomMeshes.push(handleMesh);

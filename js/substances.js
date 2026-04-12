@@ -7,15 +7,15 @@ function initSubstances() {
   SUBSTANCES = {
     kcn: {
       id: 'kcn',
-      name: 'White Powder',
+      name: L('kcn.name'),
       visual: { shape: 'sphere', color: 0xffffff, size: 0.05 },
       properties: {
-        smell: { description: 'You detect a faint bitter almond scent.', detectDistance: 2.0 },
-        taste: { lethal: true, delay: 0, description: 'Intensely bitter.' },
-        touch: { residue: true, residueId: 'kcn_residue', description: 'Fine crystalline powder clings to your fingers.' },
-        look: { description: 'Fine white crystalline powder. It catches the light slightly.' },
-        listen: { description: 'Silence. The powder sits perfectly still.' },
-        smellClose: { description: 'A distinct bitter almond scent.' }
+        smell: { description: L('kcn.smell'), detectDistance: 2.0 },
+        taste: { lethal: true, delay: 0, description: L('kcn.taste') },
+        touch: { residue: true, residueId: 'kcn_residue', description: L('kcn.touch') },
+        look: { description: L('kcn.look') },
+        listen: { description: L('kcn.listen') },
+        smellClose: { description: L('kcn.smellClose') }
       },
       facts: {
         name: 'Potassium Cyanide (KCN)',
@@ -34,33 +34,29 @@ function initSubstances() {
     },
     red_berry: {
       id: 'red_berry',
-      name: 'Red Berry',
+      name: L('berry.name'),
       visual: { shape: 'sphere', color: 0xCC2222, size: 0.04 },
       properties: {
-        smell: { description: 'A faint fruity aroma.', detectDistance: 0.5 },
-        taste: { lethal: false, delay: 0, description: 'Sweet and slightly tart. Harmless.' },
-        touch: { residue: false, description: 'Smooth, slightly yielding skin.' },
-        look: { description: 'A small, round red berry with a thin stem. Appears ripe.' },
-        listen: { description: 'Silence. Just a tiny, living thing sitting still.' },
-        smellClose: { description: 'Sweet, fruity aroma. Smells like a common berry.' }
+        smell: { description: L('berry.smell'), detectDistance: 0.5 },
+        taste: { lethal: false, delay: 0, description: L('berry.taste') },
+        touch: { residue: false, description: L('berry.touch') },
+        look: { description: L('berry.look') },
+        listen: { description: L('berry.listen') },
+        smellClose: { description: L('berry.smellClose') }
       },
-      facts: {
-        name: 'Common Red Berry',
-        lethality: 'Non-toxic',
-        mechanism: 'N/A'
-      }
+      facts: { name: 'Common Red Berry', lethality: 'Non-toxic', mechanism: 'N/A' }
     },
     berry_seed: {
       id: 'berry_seed',
-      name: 'Berry Seed',
+      name: L('seed.name'),
       visual: { shape: 'sphere', color: 0x553322, size: 0.015 },
       properties: {
-        smell: { description: 'A faint earthy smell.', detectDistance: 0.3 },
-        taste: { lethal: false, delay: 0, description: 'Hard and bitter. Not edible.' },
-        touch: { residue: false, description: 'A small, hard seed. Smooth and oval-shaped.' },
-        look: { description: 'A tiny dark seed, left behind by a decayed berry.' },
-        listen: { description: 'Silence. A dead husk holds nothing to say.' },
-        smellClose: { description: 'Earthy, with a hint of old fruit.' }
+        smell: { description: L('seed.smell'), detectDistance: 0.3 },
+        taste: { lethal: false, delay: 0, description: L('seed.taste') },
+        touch: { residue: false, description: L('seed.touch') },
+        look: { description: L('seed.look') },
+        listen: { description: L('seed.listen') },
+        smellClose: { description: L('seed.smellClose') }
       },
       facts: { name: 'Berry Seed', lethality: 'Non-toxic', mechanism: 'N/A' }
     }
@@ -72,43 +68,26 @@ function getSubstance(id) {
 }
 
 // ===================== BERRY DECAY SYSTEM =====================
-var BERRY_DECAY = [
-  { name:'FRESH', t0:0, t1:360,
-    color:0xCC2222, scale:1.0, stemColor:0x336622, dist:0.5,
-    look:'A small, round red berry with a thin green stem. Appears perfectly ripe.',
-    listen:'Silence. Just a tiny, living thing sitting still.',
-    smell:'A faint fruity aroma.', smellClose:'Sweet, fruity aroma. Smells like a common berry.',
-    taste:'Sweet and slightly tart. Juicy and fresh.',
-    touch:'Smooth, firm skin with a slight give.' },
-  { name:'OVERRIPE', t0:360, t1:720,
-    color:0x991133, scale:0.95, stemColor:0x667722, dist:1.0,
-    look:'A darkening red berry. The skin is slightly wrinkled, past its prime.',
-    listen:'A faint, wet creak — the skin shifting as it softens.',
-    smell:'A sweet, cloying fruity scent.', smellClose:'Overly sweet aroma with a hint of fermentation.',
-    taste:'Very sweet, almost syrupy. Slightly mushy.',
-    touch:'Soft skin that yields easily under pressure.' },
-  { name:'FERMENTING', t0:720, t1:1080,
-    color:0x774422, scale:0.85, stemColor:0x998833, dist:1.8,
-    look:'A brown-red berry with wrinkled, darkened skin. Small droplets on the surface.',
-    listen:'Tiny bubbles pop beneath the skin. A faint fizzing.',
-    smell:'A pungent, fermenting odor.', smellClose:'Sharp alcoholic tang mixed with rotting fruit.',
-    taste:'Sour and fizzy. Unpleasant.',
-    touch:'Mushy and damp. The skin tears easily.' },
-  { name:'ROTTING', t0:1080, t1:1440,
-    color:0x332211, scale:0.65, stemColor:0x553311, dist:2.5,
-    look:'A shriveled dark mass, barely recognizable as a berry. White fuzzy mold is forming.',
-    listen:'A soft, wet squelch. Something is alive inside — microbes at work.',
-    smell:'A putrid, rotting stench.', smellClose:'Overwhelming decay. Your stomach turns.',
-    taste:'Vile. You gag involuntarily.',
-    touch:'Cold, slimy mush. It collapses in your fingers.' },
-  { name:'DECAYED', t0:1440, t1:Infinity,
-    color:0x111111, scale:0.5, stemColor:0x221100, dist:3.0,
-    look:'A tiny blackened husk. Only the seed inside remains.',
-    listen:'Silence. A dry husk holds nothing but a seed.',
-    smell:'The stench of decay and damp soil.', smellClose:'Earthy decay, like compost.',
-    taste:'A gritty, foul slime disintegrates in your mouth. A hard seed remains.',
-    touch:'Dry, crumbling remains. A hard seed rolls free.' }
-];
+var BERRY_DECAY = [];
+function buildBerryDecay() {
+  BERRY_DECAY = [
+    { name:'FRESH', t0:0, t1:360, color:0xCC2222, scale:1.0, stemColor:0x336622, dist:0.5,
+      look:L('decay.0.look'), listen:L('decay.0.listen'), smell:L('decay.0.smell'),
+      smellClose:L('decay.0.smellClose'), taste:L('decay.0.taste'), touch:L('decay.0.touch') },
+    { name:'OVERRIPE', t0:360, t1:720, color:0x991133, scale:0.95, stemColor:0x667722, dist:1.0,
+      look:L('decay.1.look'), listen:L('decay.1.listen'), smell:L('decay.1.smell'),
+      smellClose:L('decay.1.smellClose'), taste:L('decay.1.taste'), touch:L('decay.1.touch') },
+    { name:'FERMENTING', t0:720, t1:1080, color:0x774422, scale:0.85, stemColor:0x998833, dist:1.8,
+      look:L('decay.2.look'), listen:L('decay.2.listen'), smell:L('decay.2.smell'),
+      smellClose:L('decay.2.smellClose'), taste:L('decay.2.taste'), touch:L('decay.2.touch') },
+    { name:'ROTTING', t0:1080, t1:1440, color:0x332211, scale:0.65, stemColor:0x553311, dist:2.5,
+      look:L('decay.3.look'), listen:L('decay.3.listen'), smell:L('decay.3.smell'),
+      smellClose:L('decay.3.smellClose'), taste:L('decay.3.taste'), touch:L('decay.3.touch') },
+    { name:'DECAYED', t0:1440, t1:Infinity, color:0x111111, scale:0.5, stemColor:0x221100, dist:3.0,
+      look:L('decay.4.look'), listen:L('decay.4.listen'), smell:L('decay.4.smell'),
+      smellClose:L('decay.4.smellClose'), taste:L('decay.4.taste'), touch:L('decay.4.touch') }
+  ];
+}
 
 var _bc1 = new THREE.Color(), _bc2 = new THREE.Color();
 
@@ -210,7 +189,9 @@ function removeBerry(mesh) {
   seed.userData.interactable = true;
   seed.userData.substanceId = 'berry_seed';
   seed.userData.type = 'substance';
-  seed.userData.name = 'Berry Seed';
+  seed.userData.nameKey = 'seed.name';
+  seed.userData.name = L('seed.name');
+  seed.userData.roomKey = mesh.userData.roomKey;
   seed.userData.room = mesh.userData.room;
   G.scene.add(seed);
   G.interactables.push(seed);

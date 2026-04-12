@@ -11,11 +11,7 @@ var _nudge = {
   timer: 0,
   yawAccum: 0,
   lastYaw: null,
-  msgs: [
-    '风从西边吹来。',
-    '地面上有个凹陷。',
-    '前人的墓碑在世界的边缘。'
-  ],
+  msgKeys: ['nudge.0', 'nudge.1', 'nudge.2'],
   delays: [60, 30, 30]  // seconds between each message
 };
 
@@ -59,11 +55,11 @@ function updateNudge(dt) {
   _nudge.timer += dt;
 
   // Trigger conditions: near spawn + enough time passed for current stage
-  if (_nudge.stage < _nudge.msgs.length && _nudge.timer >= _nudge.delays[_nudge.stage]) {
-    showNudgeMsg(_nudge.msgs[_nudge.stage]);
+  if (_nudge.stage < _nudge.msgKeys.length && _nudge.timer >= _nudge.delays[_nudge.stage]) {
+    showNudgeMsg(L(_nudge.msgKeys[_nudge.stage]));
     _nudge.timer = 0;
     _nudge.stage++;
-    if (_nudge.stage >= _nudge.msgs.length) {
+    if (_nudge.stage >= _nudge.msgKeys.length) {
       _nudge.triggered = true;
     }
   }
@@ -110,18 +106,13 @@ function getGateQuestion() {
 
   // Pick question based on cause
   if (causeId === 'kcn_ingestion') {
-    return '上一位尝了什么？\n你打算怎么做？';
+    return L('gate.kcn');
   }
   if (causeId === 'cross_contamination_death') {
-    return '上一位碰过什么？你碰过什么？\n有什么不同吗？';
+    return L('gate.cross');
   }
 
-  // Generic: same path twice
-  var pool = [
-    '同样的路走两次，结果会不同吗？',
-    '上一位留下了什么痕迹？',
-    '迷宫记得你。它在等你注意到什么。'
-  ];
+  var pool = [L('gate.generic.0'), L('gate.generic.1'), L('gate.generic.2')];
   return pool[Math.floor(Math.random() * pool.length)];
 }
 

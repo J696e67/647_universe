@@ -35,7 +35,7 @@ function setupControls() {
         G.px = G.HSE_X;
         G.pz = G.HSE_Z + 4;
       }
-      showMsg('R — position reset');
+      showMsg(L('hint.reset'));
     }
   });
   document.addEventListener('keyup', function(e) { G.keys[e.code] = false; });
@@ -219,7 +219,7 @@ function updatePlayer(dt) {
 
   // Maze entrance hint
   if (pDist(G.px, G.pz, 0, 0) < 2.5) {
-    G.mazeHintEl.textContent = 'ontouchstart' in window ? '轻点进入' : '按空格进入迷宫';
+    G.mazeHintEl.textContent = 'ontouchstart' in window ? L('hint.maze_enter.mobile') : L('hint.maze_enter.desktop');
     G.mazeHintEl.style.opacity = '1';
   } else {
     G.mazeHintEl.style.opacity = '0';
@@ -276,7 +276,7 @@ function updatePlayerMaze(dt) {
   // Exit hint
   var exitDist = Math.sqrt((G.mpx-2)*(G.mpx-2)+(G.mpz-2)*(G.mpz-2));
   if (G.mazeExitReady && exitDist < 3) {
-    G.mazeHintEl.textContent = 'ontouchstart' in window ? '轻点离开' : '按空格离开迷宫';
+    G.mazeHintEl.textContent = 'ontouchstart' in window ? L('hint.maze_exit.mobile') : L('hint.maze_exit.desktop');
     G.mazeHintEl.style.opacity = '1';
   } else {
     G.mazeHintEl.style.opacity = '0';
@@ -343,7 +343,7 @@ function transitionToMaze() {
     G.mazeHintEl.style.opacity = '0';
 
     // Log entry to notebook
-    addNotebookEntry('enter', 'Maze', 'Maze Entrance', 'Entered the maze');
+    addNotebookEntry('enter', 'Maze', 'Maze Entrance', L('entered_maze'));
 
     setTimeout(function() { G.fadeEl.style.opacity = '0'; }, 150);
   }, 500);
@@ -367,7 +367,7 @@ function transitionToOutdoor() {
     G.mazeHintEl.style.opacity = '0';
     hideActionMenu();
 
-    addNotebookEntry('exit', 'Maze', 'Maze Entrance', 'Exited the maze');
+    addNotebookEntry('exit', 'Maze', 'Maze Entrance', L('exited_maze'));
 
     setTimeout(function() { G.fadeEl.style.opacity = '0'; }, 150);
   }, 500);

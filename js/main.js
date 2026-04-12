@@ -2,6 +2,9 @@
 
 // ===================== GLOBAL STATE =====================
 var G = window.G = {
+  // Language
+  lang: 'zh',
+
   // Three.js core
   scene: null, cam: null, ren: null, clk: null,
   dummy: new THREE.Object3D(),
@@ -161,6 +164,15 @@ function init() {
   // Clock
   G.clk = new THREE.Clock();
 
+  // Language — load saved preference
+  try { var sl = localStorage.getItem('647_lang'); if (sl) G.lang = sl; } catch(e) {}
+  refreshLanguage();
+
+  // Language toggle button
+  document.getElementById('lang-btn').addEventListener('click', function(e) {
+    e.stopPropagation(); toggleLang();
+  });
+
   // DOM refs
   G.fadeEl = document.getElementById('fade');
   G.mazeHintEl = document.getElementById('maze-hint');
@@ -187,6 +199,7 @@ function init() {
 
   // Init substances (Phase 3)
   initSubstances();
+  buildBerryDecay();
   initSurfaces();
 
   // Init characters (Phase 4)
@@ -255,7 +268,7 @@ function init() {
       var subEl = document.getElementById('subtitle');
       titleEl.style.opacity = '1';
       titleEl.style.transition = 'opacity 1.5s';
-      subEl.textContent = 'Play until you die. Play until you know why.';
+      subEl.textContent = L('loading.tag');
       subEl.style.opacity = '1';
       subEl.style.transition = 'opacity 1.5s';
       setTimeout(function() {
@@ -267,13 +280,14 @@ function init() {
           // Show hint
           if (!G.hintShown) {
             var isMobile = 'ontouchstart' in window;
-            G.hintEl.textContent = isMobile ? '左侧拖动移动，右侧拖动转向，轻点互动' : '点击进入，WASD移动，鼠标转向';
+            G.hintEl.textContent = isMobile ? L('hint.mobile') : L('hint.desktop');
             G.hintEl.style.opacity = '1';
             setTimeout(function() { G.hintEl.style.opacity = '0'; G.hintShown = true; }, 5000);
           }
           // Show character name and notebook button
           document.getElementById('char-name').style.opacity = '1';
           document.getElementById('notebook-btn').style.opacity = '1';
+          document.getElementById('lang-btn').style.opacity = '1';
           document.getElementById('crosshair').style.opacity = '1';
         }, 1500);
       }, 3000);
