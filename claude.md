@@ -5,39 +5,42 @@
 Browser-based 3D science inquiry game. Players explore a world using five senses, die from unknown causes, and investigate their own deaths across multiple lives. Nested inside 647号宇宙, a PBC (periodic boundary condition) space.
 
 No tutorials. No hints. No scores. Learning emerges from interaction.
+Full design spec: see GDD.md.
 
 ## Tech Stack
 - Three.js for 3D rendering
 - Web Audio API for procedural audio
-- Claude Sonnet (Anthropic API) for Tombstone AI dialogue, local Ollama as fallback
+- Claude Sonnet 4.6 (Anthropic API) for Tombstone AI dialogue
 - Vanilla HTML/CSS/JS, no frameworks
 - Single index.html entry point
 
 ## File Structure
 ```
 /
-├── index.html          # Entry point
+├── index.html              # Entry point
+├── GDD.md                  # Game Design Document v1.1
+├── config.local.js         # Local API key (gitignored)
 ├── css/
-│   └── style.css       # UI overlay styles
+│   └── style.css           # UI overlay styles
 ├── js/
-│   ├── main.js         # Game init, render loop
-│   ├── world.js        # 647 outer world (terrain, sky, house, tombstone)
-│   ├── maze.js         # Inner maze generation with PBC
-│   ├── rooms.js        # Room definitions and hazard placement
-│   ├── player.js       # Player controller, movement, first-person camera
-│   ├── senses.js       # Five-sense interaction system
-│   ├── substances.js   # Substance definitions, properties, residue tracking
-│   ├── surfaces.js     # Surface contamination state management
-│   ├── effects.js      # Delayed effects, symptoms, death triggers
-│   ├── notebook.js     # Persistent cross-life notebook
-│   ├── characters.js   # Character lifecycle, death, respawn
-│   ├── tombstone.js    # AI dialogue interface (Claude API + Ollama fallback)
-│   ├── equipment.js    # Requestable equipment system
-│   ├── leaderboard.js  # Discovery tracking and leaderboard
-│   ├── sky.js          # Sun/moon/star cycle
-│   └── audio.js        # Procedural audio
-├── assets/             # Minimal geometric assets
-└── CLAUDE.md           # This file
+│   ├── main.js             # Game init, render loop
+│   ├── world.js            # 647 outer world (terrain, sky, house, tombstone)
+│   ├── maze.js             # Inner maze generation with PBC
+│   ├── rooms.js            # Room definitions and hazard placement
+│   ├── player.js           # Player controller, movement, first-person camera
+│   ├── senses.js           # Five-sense interaction system
+│   ├── substances.js       # Substance definitions, properties, residue tracking
+│   ├── surfaces.js         # Surface contamination state management
+│   ├── effects.js          # Delayed effects, symptoms, death triggers
+│   ├── notebook.js         # Persistent cross-life notebook + CER Board
+│   ├── characters.js       # Character lifecycle, death, respawn
+│   ├── tombstone.js        # AI dialogue interface (Claude Sonnet + offline fallback)
+│   ├── equipment.js        # Requestable equipment system
+│   ├── leaderboard.js      # Knowledge claim tracking (14 claims, 6 tiers)
+│   ├── sky.js              # Sun/moon/star cycle (real star catalog, 39.9°N)
+│   ├── antistuck.js        # Anti-stuck system
+│   └── audio.js            # Procedural audio
+└── assets/                 # Minimal geometric assets
 ```
 
 ## Core Data Structures
@@ -82,13 +85,13 @@ No tutorials. No hints. No scores. Learning emerges from interaction.
   alive: true,
   hp: 100,
   handContamination: [],    // what's on their hands right now
-  activeEffects: [],         // pending delayed effects
-  interactions: [],          // log of all actions
-  equipment: []              // gloves, mask, candle, geiger counter, etc.
+  activeEffects: [],        // pending delayed effects
+  interactions: [],         // log of all actions
+  equipment: []             // gloves, mask, candle, geiger counter, etc.
 }
 ```
 
-### Notebook Entry
+### Notebook Entry (system-generated)
 ```javascript
 {
   characterName: "Alice",
@@ -96,22 +99,41 @@ No tutorials. No hints. No scores. Learning emerges from interaction.
   action: "touch",
   target: "White Powder",
   location: "Room 1 - Table",
-  result: "Hands now contaminated with residue",
-  note: null  // auto-generated or player-written
+  result: "Hands now contaminated with residue"
+}
+```
+
+### CER Entry (player-authored)
+```javascript
+{
+  id: "cer_001",
+  claim: "White powder is lethal",
+  evidence: "Alice tasted white powder and collapsed (Death Record #1)",
+  reasoning: "Tasting the powder was Alice's last action before death...",
+  validated: false,         // true when both evidence gate and articulation gate satisfied
+  tier: 1
 }
 ```
 
 ### Notebook (Persistent)
 ```javascript
 {
-  entries: [...],           // all entries across all characters
+  entries: [...],           // system-generated interaction log, all characters
   deaths: [
-    { characterName: "Alice", timestamp: 120.5, location: "Room 1", 
-      lastActions: ["touched White Powder", "tasted Red Berry"] }
+    { characterName: "Alice", timestamp: 120.5, location: "Room 1",
+      causeId: "kcn_direct", lastActions: ["touched White Powder", "tasted White Powder"] }
   ],
-  discoveries: [],          // leaderboard-qualifying insights
+  cerEntries: [],           // player-authored CER Board entries
+  validatedClaims: [],      // ids of validated knowledge claims
+  tombstoneDialogue: [],    // full dialogue history
   totalCharacters: 2,
-  currentCharacter: "Tylor"
+  currentCharacter: "Tylor",
+  // Evidence tracking
+  observedBerryStages: {},  // berryId → Set of observed decay stages
+  skyObservations: [],      // [{timestamp, pitch}] — sky-looking events
+  dayNightCycles: 0,        // full cycles experienced
+  pbcCrossed: false,        // has player crossed world boundary
+  thermometerLocations: []  // ["above", "below"]
 }
 ```
 
@@ -120,18 +142,19 @@ No tutorials. No hints. No scores. Learning emerges from interaction.
 ### Automatic Senses
 - **Vision**: Render objects in scene. Player sees everything in view frustum.
 - **Hearing**: Ambient audio per room. Some rooms have specific sounds (humming, dripping).
-- **Smell**: When player enters a room or approaches a substance with smell property, show text overlay: "You smell [description]". Trigger distance configurable per substance.
+- **Smell**: When player enters a room or approaches a substance with smell property, show text overlay. Trigger distance configurable per substance.
 
 ### Active Senses (Player-Initiated)
-Player looks at an object and gets action menu:
-- **Touch**: `[Touch]` — transfers residue if applicable, triggers contact effects
-- **Taste**: `[Taste]` — checks hand contamination FIRST, then substance properties
-- **Examine**: `[Examine]` — detailed visual description
-- **Smell (close)**: `[Smell]` — closer inspection smell, may reveal more detail
+Player looks at an object and gets radial action menu:
+- **Look**: detailed visual description
+- **Listen**: auditory inspection
+- **Smell** (close): closer olfactory inspection
+- **Touch**: transfers residue if applicable, triggers contact effects
+- **Taste**: checks hand contamination FIRST, then substance properties
 
 ### Residue Chain Logic
 ```
-Player touches Substance A (has residue: true)
+Player touches Substance A (residue: true)
   → Player.handContamination.push(A.residueId)
   → Log to Notebook
 
@@ -141,14 +164,90 @@ Player touches Surface B
 
 Next Character touches Surface B
   → Next Character.handContamination.push(A.residueId)
-  → NOT logged as "picked up residue" — player doesn't know
+  → NOT shown to player — cross-contamination is hidden
 
 Next Character tastes anything
   → Check handContamination first
-  → If lethal residue on hands → trigger death with delay
-  → Death cause in Notebook: "Died after tasting [item]"
+  → If lethal residue on hands → trigger death
+  → Death cause in records: "Died after tasting [item]"
   → Actual cause hidden: cross-contamination
 ```
+
+## Knowledge Claim System (14 Claims, 6 Tiers)
+
+Every claim requires two gates simultaneously:
+- **Evidence Gate**: Sufficient in-game observations logged
+- **Articulation Gate**: Player expresses the claim to Tombstone demonstrating understanding
+
+Articulation is evaluated holistically by Claude Sonnet — NOT by keyword matching.
+
+| Tier | # | Claim | Evidence Gate | Articulation Gate |
+|------|---|-------|--------------|-------------------|
+| 1 | 1 | White powder is lethal | ≥1 KCN death record | Causal link between powder and death |
+| 1 | 3 | Red berry is non-toxic (when uncontaminated) | Ate berry clean-handed + survived | Safety claim + specifies condition |
+| 2 | 2 | White powder is KCN | Smelled KCN + died from KCN | Identifies substance via sensory+chemistry |
+| 3 | 4 | Berry undergoes stage-based decay | Looked at berry at ≥2 decay stages | Describes sequence, not just "it changed" |
+| 3 | 8 | Sun/moon/stars move at different speeds | ≥2 day-night cycles + sky observations | Distinguishes speeds of specific bodies |
+| 4 | 5 | Temperature affects berry decay rate | Looked at berry above + below ground | Links temperature to decay speed |
+| 4 | 6 | White powder causes cross-contamination | Cross-contamination pattern in death records | Identifies contact transfer as mechanism |
+| 4 | 7 | Above/below ground temperatures differ | Thermometer used in both locations | States temperature difference as measurable fact |
+| 5 | 9 | Celestial bodies share a rotation axis | ≥2 day-night cycles | Identifies common rotational center |
+| 5 | 10 | World has PBC | Crossed boundary ≥1 time | Describes looping topology |
+| 5 | 11 | World is flat | Traveled significant distance | Articulates difference from spherical geometry |
+| 6 | 12 | Night sky matches real constellations | Night sky visible | Names specific constellations |
+| 6 | 13 | World is in northern hemisphere | Observed night sky | Identifies Polaris or N-hemisphere patterns |
+| 6 | 14 | World is at ~40°N latitude | External (player's astronomy knowledge) | States latitude with reasoning |
+
+## AI Tombstone System
+
+### Role
+The Tombstone's sole purpose is **question formulation** — helping players transform reactions into investigable questions. It does NOT trigger knowledge achievements. That is the CER Board's role.
+
+### Question Classification Framework
+Internal to system prompt — player never sees type labels.
+
+**TYPE 1 — Fact-Based Question**: "What is this white powder?"
+→ Redirect toward process: "What observations could help you figure that out?"
+
+**TYPE 2 — Comment or Observation**: "That berry killed Alice."
+→ Push toward inquiry: "It did. What do you think made it lethal?"
+
+**TYPE 3 — Question Referencing In-Game Entities**: "Does the white powder react with the berry?"
+→ Help sharpen: "How would you test that? What would you expect to see if it does?"
+
+**TYPE 4 — Philosophical or Existential**: "Why do we keep dying?"
+→ Honor without aggressive redirect: "That's worth sitting with. But while you're here — is there something specific about this world you want to understand?"
+
+**TYPE 5 — Opinion Expressed as Question**: "Isn't it obvious the powder is poison?"
+→ Surface assumption: "What makes you sure? Have you tested it directly?"
+
+**TYPE 6 — Well-Formed Investigable Question**: "If I mix the white powder with water, will it still smell like almonds?"
+→ Affirm and step back: "That sounds like something you can find out. Go try it."
+
+### Dialogue Constraints
+- **Brevity**: 2–3 sentences maximum
+- **Tone**: Calm, slightly enigmatic, never condescending
+- **No answers**: Never reveals facts about Universe 647's mechanics
+- **No classification labels**: Never announces "This is a TYPE 3 question"
+- **Death context**: References specific Death Record observations
+- **Conversation limit**: 5–7 exchanges per visit
+- **Language**: Matches player's language
+
+### Equipment Request Flow
+```
+Player: "I need gloves"
+Tombstone: "What do you want to protect against?"
+Player: "I think there's something on the surfaces"
+Tombstone: [EQUIP: gloves] "Here are gloves. What will you test first?"
+→ equipment.js grants gloves; strips [EQUIP:...] from display
+```
+
+### Technical Implementation
+- **Model**: claude-sonnet-4-6
+- **Production**: Frontend JS → Cloudflare Workers proxy → Anthropic API
+- **Local dev**: Direct browser call with `config.local.js` (gitignored), `IS_LOCAL` detection
+- **Fallback chain**: Ollama (phi3:mini) → rule-based offline responses
+- **Context injected**: Last 20 notebook entries + all death records + current character
 
 ## Delayed Effects System
 ```javascript
@@ -156,296 +255,53 @@ Next Character tastes anything
   effectId: "kcn_ingestion",
   character: "Alice",
   trigger: "taste",
-  delay: 0,              // seconds (0 = immediate for KCN taste)
-  symptoms: [],           // for delayed: [{time: 30, type: "text", msg: "dizzy"}]
+  delay: 0,         // seconds; 0 = immediate
   lethal: true,
   deathMessage: "Alice collapsed."
 }
-
-// Radiation example:
-{
-  effectId: "radiation_exposure",
-  character: "Tylor",
-  trigger: "room_duration",
-  delay: 300,             // 5 minutes after leaving room
-  symptoms: [
-    { time: 60, type: "text", msg: "You feel nauseous." },
-    { time: 180, type: "filter", effect: "blur" },
-    { time: 300, type: "death" }
-  ],
-  lethal: true,
-  exposureThreshold: 20   // seconds in room before effect triggers
-}
 ```
 
-## AI Tombstone System
+## Berry Decay System
 
-### Purpose
-The AI Tombstone is the game's core pedagogical mechanism. Its singular purpose is:
-**to help the player transform whatever they bring — a reaction, a comment, a guess, a complaint — into an investigable question.**
+Berries decay through 5 stages driven by a Q10 temperature model:
+- Stage 0 FRESH (0–360s), Stage 1 OVERRIPE (360–720s), Stage 2 FERMENTING (720–1080s),
+  Stage 3 ROTTING (1080–1440s), Stage 4 DECAYED (1440s+)
+- Above ground: 26°C (faster decay). Underground: 10°C (slower decay)
+- Rate = Q10 ^ ((T - T_ref) / 10), Q10 = 2, T_ref = 20°C
+- Color, scale, stem color, smell distance all interpolate between stages
+- Berry contamination: picking up KCN residue on hands then touching a berry deposits residue on the berry
 
-An investigable question is one that can be answered through systematic observation or experimentation within Universe 647. Once a player has a well-formed investigable question, the rest of the scientific inquiry process — designing an experiment, collecting data, drawing conclusions — follows naturally. The bottleneck in scientific thinking is not methodology; it is question formulation. The Tombstone targets this bottleneck.
+## Room Definitions
 
-### What the Tombstone Is Not
-The Tombstone does not:
-- Answer questions about Universe 647 (it does not know the answers)
-- Teach science content directly
-- Give hints about what to do next
-- Praise or evaluate the player's intelligence
+### Room 1 — Chemistry Table
+Contains: KCN (white powder, cone shape), Red Berry (sphere with stem + decay system), Door Handle (contamination surface)
 
-It is a Socratic interlocutor whose only move is to help the player hear the difference between what they said and what they could investigate.
-
-### Question Classification Framework
-When a player speaks to the Tombstone, their input falls into one of several categories. The Tombstone's response strategy differs by category. The player does not see these labels — classification is internal to the system prompt.
-
-**TYPE 1 — Fact-Based Question**
-"What is this white powder?"
-Already has the form of a question, but expects a factual answer the Tombstone cannot provide.
-→ Redirect toward process: "What observations could help you figure that out?"
-
-**TYPE 2 — Comment or Observation**
-"That berry killed Alice."
-Not a question at all.
-→ Acknowledge and push toward inquiry: "It did. What do you think made it lethal?"
-
-**TYPE 3 — Question Referencing In-Game Entities**
-"Does the white powder react with the berry?"
-Close to an investigable question.
-→ Help sharpen it: "How would you test that? What would you expect to see if it does?"
-
-**TYPE 4 — Philosophical or Existential Question**
-"Why do we keep dying?"
-Valid but not investigable within the game's empirical framework.
-→ Honor without redirecting aggressively: "That's worth sitting with. But while you're here — is there something specific about this world you want to understand?"
-
-**TYPE 5 — Opinion Expressed as Question**
-"Isn't it obvious the powder is poison?"
-Contains an assumption disguised as inquiry.
-→ Surface the assumption: "What makes you sure? Have you tested it directly?"
-
-**TYPE 6 — Well-Formed Investigable Question**
-"If I mix the white powder with water, will it still smell like almonds?"
-This is the target output.
-→ Affirm and step back: "That sounds like something you can find out. Go try it."
-
-### Dialogue Constraints
-- **Brevity**: 2–3 sentences maximum per response
-- **Tone**: Calm, slightly enigmatic, never condescending. Speaks as someone who has seen many explorers come and go
-- **No answers**: Never reveals facts about Universe 647's mechanics
-- **Death context**: Has access to the Notebook and Death Records; can reference specific observations (e.g., "Alice smelled something before she tasted it. Did you notice what?")
-- **Conversation limit**: 5–7 exchanges per Tombstone visit to prevent over-reliance on dialogue vs. experimentation
-- **Language**: Responds in the same language the player uses
-
-### Technical Implementation
-
-**Primary: Claude Sonnet via Anthropic API**
-```
-Architecture: Frontend JS → Cloudflare Workers proxy → Anthropic API
-Model: claude-sonnet-4-20250514
-System prompt: Tombstone persona + TYPE classification logic + Notebook context
-Max tokens: ~150 (enforces brevity)
-```
-
-**Fallback 1: Local Ollama**
-```
-When: Anthropic API unreachable or player opts for offline play
-Model: phi3:mini or similar local model
-Endpoint: http://localhost:11434/api/generate
-Limitation: Weaker classification accuracy, may break TYPE constraints
-```
-
-**Fallback 2: Rule-Based Offline Responses**
-```
-When: Both API and Ollama unavailable
-Behavior: Keyword-matched responses from a curated pool
-Limitation: No contextual reasoning, no Notebook reference
-```
-
-**Context Injection**
-```javascript
-// Injected into system prompt on each message:
-// - Last 20 Notebook entries (actions, timestamps, locations)
-// - All Death Records (character, cause, last actions)
-// - Current character name and total character count
-// - Current equipment list
-```
-
-### Equipment Request Flow
-Equipment is granted only when the player articulates what they want to test and why.
-```
-Player: "I need gloves"
-Tombstone: "What do you want to protect against?"
-Player: "I think there's something on the surfaces"
-Tombstone: "What evidence led you to that conclusion?"
-Player: "Tylor died after touching a door handle that Alice touched"
-Tombstone: "Interesting observation. Here are gloves. What will you test first?"
-→ equipment.js adds "gloves" to character.equipment
-→ When wearing gloves: touch actions no longer transfer residue
-```
-The Tombstone signals equipment grants by appending `[EQUIP: item_name]` to its response (stripped from display).
-
-## Room Definitions (Scenario 1: White Powder)
-
-### Room 1 — The Chemistry Table
-```javascript
-{
-  id: "room_1",
-  name: "Chemistry Table Room",
-  dimensions: [6, 3, 6],
-  objects: [
-    { type: "table", position: [0, 0, 0] },
-    { type: "substance", id: "kcn", position: [0, 1, 0.2] },
-    { type: "substance", id: "red_berry", position: [0.5, 1, -0.1] },
-    { type: "surface", id: "room1_doorhandle", position: [-3, 1.2, 0] }
-  ],
-  ambient: {
-    light: 0.6,
-    sound: null,
-    smell: null  // KCN smell triggers on proximity
-  }
-}
-```
+### Room 2 — Ventilation Room
+Contains: Ceiling vent, drainage grate. No interactive substances (environment-only room).
 
 ## 647号宇宙 Outer World
 
-### Terrain
-- Flat wheat field, 1000m × 1000m logical space
-- PBC wrapping: position.x = ((position.x % 1000) + 1000) % 1000
-- Wheat: instanced mesh, procedural placement
-- Ground: subtle texture, warm earth tone
+- **Terrain**: Flat wheat field, 200×200 unit world with PBC wrapping
+- **Sky**: Real star catalog (92 named stars, 39.9°N observer), constellation lines, realistic sun/moon paths
+- **House**: Interior with table + book. Ceiling lamp. Connects to maze entrance.
+- **Tombstone**: Circular ring structure at PBC boundary seam. Reverse-perspective scaling. Dialogue activates at <5m.
+- **Death gravestones**: Clustered around AI tombstone (radius 19), glow in cause color
+- **Maze entrance**: Depression with 4 glowing pillars
 
-### Sky System (already implemented)
-- Sun, moon, stars on circular orbit
-- 3-minute full day/night cycle
-- Sky color gradient transitions
+## UI
 
-### Key Objects
-- **House**: position [500, 0, 500] (center of PBC space)
-  - Interior: table + book 《时间之外的往事》
-  - One wall has door to maze entrance
-- **Tombstone**: circular, positioned at PBC boundary seam
-  - Glowing text interface when player approaches
-  - Dialogue box overlay
-- **Maze Entrance**: depression with 4 pillars, adjacent to house
-
-### PBC Visual Cue
-- When player walks far enough in any direction, they see the house again
-- No invisible walls, no loading screens — seamless wrap
-
-## Inner Maze
-
-### Generation
-- Grid-based corridor system
-- PBC on maze boundaries (player exits left, enters right)
-- Multiple rooms connected by corridors
-- Rooms contain different scenarios (only Scenario 1 for v2)
-
-### Layout (v2)
-```
-[Entrance] → [Corridor A] → [Room 1: Chemistry Table]
-                           → [Corridor B] → [Room 2: Ventilation Room]
-                           → [Corridor C] → [Room 1 again (PBC)]
-```
-Players who walk far enough through corridors return to rooms they've been in. The layout is designed so this is not immediately obvious.
-
-## UI Overlay
-
-### HUD (minimal)
-- Current character name (top left)
-- "Notebook" button (top right) → opens full notebook view
-- Action menu (bottom center, contextual) → appears when looking at interactable
-- Tombstone dialogue box (center, when near tombstone)
-
-### Death Screen
-- Screen fades to black
-- Text: "[Character Name] has died."
-- Brief pause
-- Text: "A new explorer arrives at Universe 647."
-- New character name displayed
-- Fade in at house entrance
-
-### Notebook View
-- Scrollable log of all entries
-- Filter by character name
-- Deaths highlighted in red
-- Search function
-
-## Leaderboard Conditions (v2)
-
-```javascript
-const DISCOVERIES = [
-  {
-    id: "kcn_direct",
-    description: "Identified KCN as cause of death by tasting",
-    condition: (notebook) => {
-      // Player told tombstone about KCN and bitter almond
-      return notebook.tombstoneDialogue.some(d => 
-        d.includes("cyanide") || d.includes("KCN") || d.includes("氰化钾")
-      );
-    }
-  },
-  {
-    id: "cross_contamination",
-    description: "Identified cross-contamination chain",
-    condition: (notebook) => {
-      // Player articulated: residue → surface → next character
-      return notebook.tombstoneDialogue.some(d =>
-        d.includes("residue") || d.includes("contamination") || 
-        d.includes("残留") || d.includes("交叉")
-      );
-    }
-  },
-  {
-    id: "pbc_outer",
-    description: "Discovered Universe 647 is a PBC space",
-    condition: (notebook) => {
-      return notebook.tombstoneDialogue.some(d =>
-        d.includes("loop") || d.includes("cycle") || d.includes("boundary") ||
-        d.includes("循环") || d.includes("边界")
-      );
-    }
-  },
-  {
-    id: "pbc_inner",
-    description: "Discovered the inner maze is also PBC",
-    condition: (notebook) => {
-      return notebook.tombstoneDialogue.some(d =>
-        (d.includes("maze") || d.includes("迷宫")) &&
-        (d.includes("loop") || d.includes("repeat") || d.includes("循环"))
-      );
-    }
-  }
-];
-```
-
-## Performance Targets
-- 60fps on modern mobile browsers
-- < 5MB total asset size
-- Claude API latency < 2s per response (via Cloudflare Workers)
-- Ollama fallback latency < 3s per response (local)
-- No external dependencies beyond Three.js CDN
-
-## Build & Run
-```bash
-# Option A: With Claude API (recommended)
-# Set ANTHROPIC_API_KEY in Cloudflare Workers environment
-# Deploy worker, then serve the game
-npx serve .
-
-# Option B: With local Ollama (offline/development)
-ollama run phi3:mini    # separate terminal
-npx serve .
-
-# Option C: Fully offline (rule-based fallback only)
-npx serve .
-```
+- **HUD**: Character name (top left), Notebook button (top right), Language toggle, Crosshair
+- **Radial action menu**: 5 sense buttons arranged in circle around crosshair target
+- **Tombstone chat**: Bottom overlay, active within 5m of tombstone
+- **Death screen**: Fade to black → "[Name] collapsed." → "A new explorer arrives."
+- **Notebook overlay**: System log + CER Board tabs, filter by character, deaths in red
 
 ## Important Constraints
 - NO tutorial text, help screens, or objective markers
 - NO health bars, damage numbers, or RPG mechanics
 - Death messages are neutral ("Alice collapsed"), not dramatic
-- The Notebook records facts, not interpretations
-- Equipment does exactly what it should — gloves block residue, gas masks block inhalation, Geiger counters click near radiation
-- The Tombstone never lies, never misleads, never answers questions about Universe 647's mechanics
-- The Tombstone's goal is question formulation, not answer delivery — it transforms player input into investigable questions (see TYPE 1–6 classification)
+- System notebook entries record facts, not interpretations — player CER entries contain interpretations
+- Tombstone never answers questions about Universe 647's mechanics
+- Tombstone goal = question formulation only; CER Board = knowledge articulation
 - All science must be accurate — real chemistry, real physics, real toxicology
+- Articulation quality evaluated by Claude Sonnet holistically, not keyword matching
