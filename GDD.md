@@ -5,6 +5,23 @@ Author: Jing
 
 ---
 
+## 0. Terminology
+
+These terms have a single fixed meaning across the whole document. If a later section mentions one of these words, it refers to the entity defined here — not to a new object.
+
+- **Tombstone** — the AI Socratic interlocutor at the PBC boundary seam. §7.
+- **Ring structure / Ring** — the ring-shaped visual form of the Tombstone (reverse perspective, torus geometry on a pedestal). Any mention of a "ring" in this document refers to the Tombstone's ring unless explicitly stated otherwise. §9.
+- **River / Stream** — the flowing water body whose color reflects cumulative contamination across lives. Environmental health indicator. §3.3.
+- **Horizon** — the visual vanishing line seen by the player in the outer world. Not an object; no geometry is attached to it.
+- **PBC** — Periodic Boundary Conditions. The world (both outer and inner maze) wraps: walking far enough in any direction returns the player to the origin. §3.1.
+- **Death Record** — a system-generated, immutable log of one explorer's death (character, timestamp, last actions, cause). §6.1.
+- **CER Board** — the player-authored Claim–Evidence–Reasoning panel inside the Notebook. Where articulation happens. §8.1.
+- **Claim** — one of the 14 discoverable knowledge claims about Universe 647. §3.2.
+- **Evidence Gate / Articulation Gate** — the two checks every Claim must pass to be validated. §3.2.
+- **Explorer** — one of the sequential characters the player inhabits. Each death yields a new Explorer. §6.2.
+
+---
+
 ## 1. Overview
 
 **Title**: 神农堂 Shennong Tang
@@ -97,7 +114,7 @@ Every knowledge claim requires two gates to be satisfied simultaneously:
 ### 3.3 Atmosphere & Environment
 
 - **Sky system**: Dynamic day-night cycle; dusk/dawn lighting as emotional anchors.
-- **Ring structure**: A massive ring-shaped architectural form visible on the horizon — ambiguous in function, inviting speculation.
+- **Ring structure (Tombstone)**: The AI Tombstone itself is a ring-shaped architectural form standing at the PBC boundary seam. Its reverse-perspective scaling makes it loom at a distance and shrink as the player approaches — ambiguous in function, inviting speculation. See §9.
 - **River**: Functions as an environmental health indicator. Water quality, flow, color, and the organisms within it change in response to contamination events and player actions.
 - **Structures**: Simple grey buildings serve as experiment stations containing interactive substances.
 

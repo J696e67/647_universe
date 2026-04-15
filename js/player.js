@@ -203,10 +203,12 @@ function updatePlayer(dt) {
   if (!houseCollide(G.px, nz)) G.pz = nz;
 
   // PBC wrapping
-  if (G.px > G.HW) G.px -= G.W;
-  if (G.px < -G.HW) G.px += G.W;
-  if (G.pz > G.HW) G.pz -= G.W;
-  if (G.pz < -G.HW) G.pz += G.W;
+  var wrapped = false;
+  if (G.px > G.HW) { G.px -= G.W; wrapped = true; }
+  if (G.px < -G.HW) { G.px += G.W; wrapped = true; }
+  if (G.pz > G.HW) { G.pz -= G.W; wrapped = true; }
+  if (G.pz < -G.HW) { G.pz += G.W; wrapped = true; }
+  if (wrapped && G.notebook) G.notebook.pbcCrossed = true;
 
   // Camera
   var gy = groundH(G.px, G.pz);
@@ -216,6 +218,19 @@ function updatePlayer(dt) {
   G.cam.rotation.order = 'YXZ';
   G.cam.rotation.y = G.yaw;
   G.cam.rotation.x = G.pitch;
+
+  // Evidence: sky observation (pitch up, throttled to 30s)
+  if (G.pitch > 0.5 && G.notebook) {
+    if (!G._lastSkyObs) G._lastSkyObs = -9999;
+    if (G.gameTime - G._lastSkyObs > 30) {
+      G._lastSkyObs = G.gameTime;
+      G.notebook.skyObservations.push({
+        timestamp: G.gameTime,
+        pitch: G.pitch,
+        isNight: !!G._skyIsNight
+      });
+    }
+  }
 
   // Maze entrance hint
   if (pDist(G.px, G.pz, 0, 0) < 2.5) {
@@ -258,10 +273,12 @@ function updatePlayerMaze(dt) {
   if (!mazeCollide(G.mpx, nz)) G.mpz = nz;
 
   // Maze PBC
-  if (G.mpx > G.MHALF) G.mpx -= G.MSIZE;
-  if (G.mpx < -G.MHALF) G.mpx += G.MSIZE;
-  if (G.mpz > G.MHALF) G.mpz -= G.MSIZE;
-  if (G.mpz < -G.MHALF) G.mpz += G.MSIZE;
+  var mwrapped = false;
+  if (G.mpx > G.MHALF) { G.mpx -= G.MSIZE; mwrapped = true; }
+  if (G.mpx < -G.MHALF) { G.mpx += G.MSIZE; mwrapped = true; }
+  if (G.mpz > G.MHALF) { G.mpz -= G.MSIZE; mwrapped = true; }
+  if (G.mpz < -G.MHALF) { G.mpz += G.MSIZE; mwrapped = true; }
+  if (mwrapped && G.notebook) G.notebook.pbcCrossed = true;
 
   if (!G.mazeExitReady && Math.sqrt((G.mpx-2)*(G.mpx-2)+(G.mpz-2)*(G.mpz-2)) > 8) G.mazeExitReady = true;
 

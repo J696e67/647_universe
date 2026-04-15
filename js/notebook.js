@@ -8,8 +8,21 @@ function initNotebook() {
     discoveries: [],
     totalCharacters: 0,
     currentCharacter: null,
-    tombstoneDialogue: []
+    tombstoneDialogue: [],
+    // CER Board (player-authored)
+    cerEntries: [],
+    validatedClaims: [],
+    // Evidence tracking for 14-claim gates
+    observedBerryStages: {},   // berryUuid → { stages: [0,1,...], clean: bool }
+    skyObservations: [],       // [{timestamp, pitch, isNight}]
+    dayNightCycles: 0,
+    lastCycleMark: 0,
+    pbcCrossed: false,
+    thermometerLocations: [],  // 'above' | 'below'
+    berryCleanEatenSurvived: false,
+    crossContaminationDeathSeen: false
   };
+  if (typeof seedScaffoldedCerEntries === 'function') seedScaffoldedCerEntries();
 }
 
 function addNotebookEntry(action, target, location, result) {
@@ -27,6 +40,8 @@ function addNotebookEntry(action, target, location, result) {
 }
 
 // ===================== NOTEBOOK UI =====================
+var NOTEBOOK_MODE = 'log';  // 'log' | 'cer'
+
 function toggleNotebook() {
   var overlay = document.getElementById('notebook-overlay');
   if (overlay.classList.contains('active')) {
@@ -38,6 +53,7 @@ function toggleNotebook() {
 }
 
 function renderNotebook(filterChar) {
+  if (NOTEBOOK_MODE === 'cer') { renderCerBoard(); return; }
   var content = document.getElementById('notebook-content');
   var filters = document.getElementById('notebook-filters');
 
@@ -49,6 +65,24 @@ function renderNotebook(filterChar) {
   }
 
   filters.innerHTML = '';
+
+  // Mode tabs: Log | CER Board
+  var logTab = document.createElement('button');
+  logTab.textContent = L('notebook.log');
+  logTab.className = 'active';
+  logTab.addEventListener('click', function() { NOTEBOOK_MODE = 'log'; renderNotebook(); });
+  filters.appendChild(logTab);
+
+  var cerTab = document.createElement('button');
+  cerTab.textContent = L('notebook.cer');
+  cerTab.addEventListener('click', function() { NOTEBOOK_MODE = 'cer'; renderNotebook(); });
+  filters.appendChild(cerTab);
+
+  var sep = document.createElement('span');
+  sep.style.cssText = 'color:rgba(255,255,255,0.15);padding:0 4px;';
+  sep.textContent = '|';
+  filters.appendChild(sep);
+
   var allBtn = document.createElement('button');
   allBtn.textContent = L('notebook.all');
   allBtn.className = !filterChar ? 'active' : '';

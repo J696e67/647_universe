@@ -433,6 +433,16 @@ function setupLights() {
 function updateDayNight(elapsed) {
   var phase = (elapsed % G.CYCLE) / G.CYCLE;
 
+  // Day/night cycle count (evidence for claims #8, #9)
+  if (G.notebook) {
+    var cycle = Math.floor(elapsed / G.CYCLE);
+    if (cycle > (G.notebook.lastCycleMark || 0)) {
+      G.notebook.dayNightCycles = cycle;
+      G.notebook.lastCycleMark = cycle;
+    }
+    G._skyIsNight = phase > 0.5;
+  }
+
   // ================================================================
   // SUN — realistic path at 39.9°N, declination 15° (late spring)
   // ================================================================

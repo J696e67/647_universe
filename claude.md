@@ -24,7 +24,7 @@ Full design spec: see GDD.md.
 │   └── style.css           # UI overlay styles
 ├── js/
 │   ├── main.js             # Game init, render loop
-│   ├── world.js            # 647 outer world (terrain, sky, house, tombstone)
+│   ├── world.js            # 647 outer world (terrain, sky, house, tombstone, river)
 │   ├── maze.js             # Inner maze generation with PBC
 │   ├── rooms.js            # Room definitions and hazard placement
 │   ├── player.js           # Player controller, movement, first-person camera
@@ -32,12 +32,14 @@ Full design spec: see GDD.md.
 │   ├── substances.js       # Substance definitions, properties, residue tracking
 │   ├── surfaces.js         # Surface contamination state management
 │   ├── effects.js          # Delayed effects, symptoms, death triggers
-│   ├── notebook.js         # Persistent cross-life notebook + CER Board
+│   ├── notebook.js         # Persistent cross-life notebook (system log)
+│   ├── cer.js              # CER Board: 14 claims, 3 scaffolded entries, holistic Claude evaluator
 │   ├── characters.js       # Character lifecycle, death, respawn
-│   ├── tombstone.js        # AI dialogue interface (Claude Sonnet + offline fallback)
+│   ├── tombstone.js        # AI dialogue (Claude Sonnet, 6-TYPE framework + offline fallback)
 │   ├── equipment.js        # Requestable equipment system
-│   ├── leaderboard.js      # Knowledge claim tracking (14 claims, 6 tiers)
+│   ├── leaderboard.js      # 14-claim × 6-tier knowledge display (driven by validatedClaims)
 │   ├── sky.js              # Sun/moon/star cycle (real star catalog, 39.9°N)
+│   ├── lang.js             # EN/ZH internationalization strings
 │   ├── antistuck.js        # Anti-stuck system
 │   └── audio.js            # Procedural audio
 └── assets/                 # Minimal geometric assets
@@ -118,22 +120,40 @@ Full design spec: see GDD.md.
 ### Notebook (Persistent)
 ```javascript
 {
-  entries: [...],           // system-generated interaction log, all characters
+  entries: [...],               // system-generated interaction log, all characters
   deaths: [
     { characterName: "Alice", timestamp: 120.5, location: "Room 1",
-      causeId: "kcn_direct", lastActions: ["touched White Powder", "tasted White Powder"] }
+      causeId: "kcn_ingestion", lastActions: ["touched White Powder", "tasted White Powder"] }
   ],
-  cerEntries: [],           // player-authored CER Board entries
-  validatedClaims: [],      // ids of validated knowledge claims
-  tombstoneDialogue: [],    // full dialogue history
+  cerEntries: [],               // player-authored CER Board entries (3 scaffolded on init, rest free-form)
+  validatedClaims: [],          // ids of validated knowledge claims (1..14)
+  tombstoneDialogue: [],        // full dialogue history
   totalCharacters: 2,
   currentCharacter: "Tylor",
-  // Evidence tracking
-  observedBerryStages: {},  // berryId → Set of observed decay stages
-  skyObservations: [],      // [{timestamp, pitch}] — sky-looking events
-  dayNightCycles: 0,        // full cycles experienced
-  pbcCrossed: false,        // has player crossed world boundary
-  thermometerLocations: []  // ["above", "below"]
+  // Evidence tracking for 14-claim gates
+  observedBerryStages: {},      // berryUuid → { stages: [0,1,...] }
+  skyObservations: [],          // [{timestamp, pitch, isNight}]
+  dayNightCycles: 0,            // full cycles experienced
+  lastCycleMark: 0,             // internal cycle counter
+  pbcCrossed: false,            // player has crossed a world boundary
+  thermometerLocations: [],     // ["above", "below"]
+  berryCleanEatenSurvived: false,
+  crossContaminationDeathSeen: false
+}
+```
+
+### CER Entry (player-authored, in notebook.cerEntries)
+```javascript
+{
+  id: "cer_001",
+  claimId: 1,                 // matches a row in the 14-claim table
+  claim: "White powder is lethal",
+  evidence: "Alice tasted white powder and collapsed (Death Record #1)",
+  reasoning: "Tasting was her last action...",
+  validated: false,           // true only when evidence gate AND holistic articulation grader pass
+  tier: 1,                    // copied from claim def
+  scaffolded: false,          // true for the 3 seed entries
+  _feedback: null             // transient grader response
 }
 ```
 
@@ -227,11 +247,12 @@ Internal to system prompt — player never sees type labels.
 ### Dialogue Constraints
 - **Brevity**: 2–3 sentences maximum
 - **Tone**: Calm, slightly enigmatic, never condescending
-- **No answers**: Never reveals facts about Universe 647's mechanics
+- **No answers**: Never reveals facts about Universe 647's mechanics (including TYPE 1 fact questions — Tombstone redirects, does NOT answer)
 - **No classification labels**: Never announces "This is a TYPE 3 question"
 - **Death context**: References specific Death Record observations
 - **Conversation limit**: 5–7 exchanges per visit
 - **Language**: Matches player's language
+- **CER handoff**: When the player articulates a world-mechanics claim in dialogue, the Tombstone only tells them to record it on the CER Board. Articulation validation happens there, not here.
 
 ### Equipment Request Flow
 ```
@@ -244,10 +265,10 @@ Tombstone: [EQUIP: gloves] "Here are gloves. What will you test first?"
 
 ### Technical Implementation
 - **Model**: claude-sonnet-4-6
-- **Production**: Frontend JS → Cloudflare Workers proxy → Anthropic API
 - **Local dev**: Direct browser call with `config.local.js` (gitignored), `IS_LOCAL` detection
 - **Fallback chain**: Ollama (phi3:mini) → rule-based offline responses
 - **Context injected**: Last 20 notebook entries + all death records + current character
+- **CER articulation evaluator**: Separate Claude Sonnet call (cer.js `evaluateArticulationHolistic`) per submitted CER entry; returns JSON `{pass, note}` against per-claim rubric. Evidence gate is checked locally first; articulation is judged holistically.
 
 ## Delayed Effects System
 ```javascript
@@ -283,10 +304,11 @@ Contains: Ceiling vent, drainage grate. No interactive substances (environment-o
 
 - **Terrain**: Flat wheat field, 200×200 unit world with PBC wrapping
 - **Sky**: Real star catalog (92 named stars, 39.9°N observer), constellation lines, realistic sun/moon paths
-- **House**: Interior with table + book. Ceiling lamp. Connects to maze entrance.
+- **House**: Interior with table + book + wall thermometer (reads 26°C above). Ceiling lamp. Connects to maze entrance.
 - **Tombstone**: Circular ring structure at PBC boundary seam. Reverse-perspective scaling. Dialogue activates at <5m.
-- **Death gravestones**: Clustered around AI tombstone (radius 19), glow in cause color
+- **Death gravestones**: Clustered around AI tombstone (radius 19), glow in a color that encodes the CAUSATIVE AGENT (substance), not the delivery mechanism. Deaths from the same substance (e.g., both direct KCN ingestion and KCN cross-contamination) share one color; different agents (radiation, gas, etc.) get different colors. Mechanism is inferred by the player from the Death Record's `lastActions`, not from color.
 - **Maze entrance**: Depression with 4 glowing pillars
+- **River**: Stream whose color drifts from clear blue toward sickly yellow-green as cumulative surface contamination across the world rises (environmental health indicator)
 
 ## UI
 

@@ -325,6 +325,7 @@ function animate() {
     updateWater(t);
     updateAudio();
     updateTombstoneRing(t);
+    updateRiverState();
     updateTombstoneChat();
     updateGravestones();
     updateNudge(dt);

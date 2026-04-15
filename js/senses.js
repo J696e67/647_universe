@@ -75,6 +75,9 @@ function hideActionMenu() {
 function getAvailableActions(obj) {
   var actions = [];
   actions.push({ label: L('action.look'), action: 'look' });
+  if (obj.userData.type === 'thermometer') {
+    return actions;  // look-only: reads temperature
+  }
   actions.push({ label: L('action.listen'), action: 'listen' });
   if (obj.userData.type === 'book') {
     actions.push({ label: L('action.read'), action: 'read' });
@@ -118,6 +121,24 @@ function doLook(obj, char, name, room) {
     text = L('look.book');
   } else if (obj.userData.type === 'surface') {
     text = L('look.surface', {name: name});
+  } else if (obj.userData.type === 'thermometer') {
+    var below = G.inMaze;
+    var temp = below ? G.TEMP_BELOW : G.TEMP_ABOVE;
+    var whereKey = below ? 'thermo.below' : 'thermo.above';
+    text = L('thermo.read', {temp: temp, where: L(whereKey)});
+    var loc = below ? 'below' : 'above';
+    if (G.notebook.thermometerLocations.indexOf(loc) === -1) {
+      G.notebook.thermometerLocations.push(loc);
+    }
+  }
+  // Record berry decay stage observations (evidence for claim #4)
+  if (obj.userData.isBerry) {
+    var key = obj.uuid;
+    if (!G.notebook.observedBerryStages[key]) {
+      G.notebook.observedBerryStages[key] = { stages: [] };
+    }
+    var bucket = G.notebook.observedBerryStages[key].stages;
+    if (bucket.indexOf(obj.userData.decayStage) === -1) bucket.push(obj.userData.decayStage);
   }
   showMsg(text);
   addNotebookEntry(L('action.look'), name, room, text);
@@ -255,6 +276,13 @@ function doTaste(obj, char, name, room) {
       result = tasteProp.description;
       showMsg(result);
       addNotebookEntry(L('action.taste'), name, room, result);
+
+      // Evidence: berry tasted with clean hands & survived → claim #3
+      if (obj.userData.isBerry && !tasteProp.lethal &&
+          char.handContamination.length === 0 &&
+          (!obj.userData.contamination || obj.userData.contamination.length === 0)) {
+        G.notebook.berryCleanEatenSurvived = true;
+      }
 
       // DECAYED berry → disintegrates, leave seed
       if (obj.userData.isBerry && obj.userData.decayStage >= 4) {

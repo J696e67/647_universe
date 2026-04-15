@@ -154,9 +154,52 @@ canvas { display: block; }
 .lb-entry { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
 .lb-entry .lb-check { color: #5a5; margin-right: 8px; }
 .lb-entry .lb-pending { color: #555; margin-right: 8px; }
+.lb-entry .lb-ready { color: #c0a060; margin-right: 8px; }
+.lb-tier { margin-bottom: 14px; }
+.lb-tier-header { color: #e0d4b8; font-size: 0.85em; letter-spacing: 0.15em;
+  text-transform: uppercase; padding: 10px 0 4px 0; border-bottom: 1px solid rgba(224,212,184,0.12);
+  margin-bottom: 4px; }
 .lb-discovery { color: rgba(200,180,120,0.8); font-size: 0.85em; margin-top: 4px;
   opacity: 0; transition: opacity 2s; position: fixed; top: 50%; left: 50%;
   transform: translate(-50%,-50%); pointer-events: none; z-index: 55; }
+
+/* CER Board */
+.cer-intro { color: rgba(200,180,120,0.7); font-size: 0.85em; padding: 8px 0 16px 0; font-style: italic; font-family: sans-serif; }
+.cer-card { position: relative; padding: 12px 14px; margin-bottom: 12px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; font-family: sans-serif; font-size: 0.88em; line-height: 1.6; }
+.cer-card.validated { border-color: rgba(120,200,140,0.5); background: rgba(120,200,140,0.05); }
+.cer-tier { position: absolute; top: 10px; right: 12px; color: #888; font-size: 0.75em;
+  padding: 2px 6px; border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; }
+.cer-validated { position: absolute; top: 10px; right: 50px; color: #7c7; font-size: 0.75em; }
+.cer-field { margin: 6px 0; }
+.cer-label { color: #e0d4b8; font-size: 0.75em; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 2px; }
+.cer-value { color: #ccc; white-space: pre-wrap; }
+.cer-actions { margin-top: 10px; display: flex; gap: 8px; }
+.cer-actions button { padding: 4px 12px; background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #ccc;
+  font-size: 0.85em; cursor: pointer; font-family: sans-serif; }
+.cer-actions button:hover { background: rgba(255,255,255,0.15); }
+.cer-feedback { margin-top: 8px; padding: 6px 8px; color: #ccb;
+  background: rgba(200,180,120,0.08); border-radius: 4px; font-size: 0.85em; }
+
+#cer-editor { position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center;
+  z-index: 70; backdrop-filter: blur(6px); }
+.cer-editor-box { width: 85%; max-width: 520px; background: #141414;
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 10px;
+  padding: 20px 22px; color: #ddd; font-family: sans-serif; max-height: 90vh; overflow-y: auto; }
+.cer-editor-box h3 { color: #e0d4b8; font-weight: normal; margin-bottom: 14px; letter-spacing: 0.1em; }
+.cer-editor-box label { display: block; color: #e0d4b8; font-size: 0.78em;
+  letter-spacing: 0.1em; text-transform: uppercase; margin: 12px 0 4px 0; }
+.cer-editor-box textarea { width: 100%; background: rgba(0,0,0,0.45);
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #fff;
+  padding: 8px 10px; font-family: sans-serif; font-size: 0.95em; line-height: 1.5; resize: vertical; }
+.cer-editor-actions { margin-top: 18px; display: flex; justify-content: flex-end; gap: 8px; }
+.cer-editor-actions button { padding: 6px 16px; background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #ddd; cursor: pointer;
+  font-family: sans-serif; font-size: 0.9em; }
+.cer-editor-actions button.primary { background: rgba(200,180,120,0.2); border-color: rgba(200,180,120,0.5); color: #e0d4b8; }
 
 /* Anti-stuck: Nudge text (Layer A) */
 #nudge-text { position: fixed; bottom: 8%; left: 50%; transform: translateX(-50%);

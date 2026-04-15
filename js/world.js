@@ -139,21 +139,40 @@ function createTrees() {
   }
 }
 
-// ===================== STREAM =====================
+// ===================== STREAM (RIVER) =====================
 function createStream() {
   var waterW = 5, waterL = G.W + 40;
-  var mat = new THREE.MeshBasicMaterial({ color: 0x4499AA, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+  G.waterMat1 = new THREE.MeshBasicMaterial({ color: 0x4499AA, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+  G.waterMat2 = G.waterMat1.clone();
   var geo1 = new THREE.PlaneGeometry(waterW, waterL, 4, 40);
   geo1.rotateX(-Math.PI / 2);
-  var w1 = new THREE.Mesh(geo1, mat);
+  var w1 = new THREE.Mesh(geo1, G.waterMat1);
   w1.position.set(G.STR_X, G.WATER_Y, 0);
   G.scene.add(w1);
   var geo2 = new THREE.PlaneGeometry(waterW, waterL, 4, 40);
   geo2.rotateX(-Math.PI / 2);
-  var w2 = new THREE.Mesh(geo2, mat.clone());
+  var w2 = new THREE.Mesh(geo2, G.waterMat2);
   w2.position.set(G.STR_X - G.W, G.WATER_Y, 0);
   G.scene.add(w2);
   G.waterGeo1 = geo1; G.waterGeo2 = geo2;
+}
+
+// Update river color to reflect cumulative contamination across surfaces.
+// GDD §3.3: river as environmental health indicator.
+function updateRiverState() {
+  if (!G.waterMat1 || !G.surfaceStates) return;
+  var count = 0;
+  for (var id in G.surfaceStates) {
+    count += (G.surfaceStates[id].contamination || []).length;
+  }
+  var t = Math.min(count / 6, 1);
+  // Clean 0x4499AA → sickly 0x8a7e3a
+  var cr = 0x44 + (0x8a - 0x44) * t;
+  var cg = 0x99 + (0x7e - 0x99) * t;
+  var cb = 0xAA + (0x3a - 0xAA) * t;
+  var hex = ((cr & 0xff) << 16) | ((cg & 0xff) << 8) | (cb & 0xff);
+  G.waterMat1.color.setHex(hex);
+  G.waterMat2.color.setHex(hex);
 }
 
 function updateWater(t) {
@@ -234,6 +253,27 @@ function createHouse() {
   hStem.position.set(mx - 0.5, gy + 0.80, mz - 1.7);
   G.scene.add(hStem);
   initBerryDecay(hBerry, hStem);
+
+  // Thermometer on house wall (evidence for claims #5, #7)
+  var thermoBody = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.32, 0.02),
+    new THREE.MeshStandardMaterial({ color: 0xeeeee4, roughness: 0.7 })
+  );
+  thermoBody.position.set(mx + 1.8, gy + 1.4, mz - wd/2 + 0.07);
+  thermoBody.userData.interactable = true;
+  thermoBody.userData.type = 'thermometer';
+  thermoBody.userData.nameKey = 'obj.thermometer';
+  thermoBody.userData.name = L('obj.thermometer');
+  thermoBody.userData.roomKey = 'obj.house_table';
+  thermoBody.userData.room = L('obj.house_table');
+  G.scene.add(thermoBody);
+  G.interactables.push(thermoBody);
+  var thermoBulb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.03, 8, 8),
+    new THREE.MeshStandardMaterial({ color: 0xcc3333, roughness: 0.4 })
+  );
+  thermoBulb.position.set(mx + 1.8, gy + 1.24, mz - wd/2 + 0.08);
+  G.scene.add(thermoBulb);
 
   // Ceiling lamp (inside house)
   var ceilRod = new THREE.Mesh(
@@ -360,9 +400,17 @@ function updateTombstoneRing(t) {
 }
 
 // ===================== DEATH GRAVESTONES (PBC BOUNDARY RING) =====================
+// Color encodes the CAUSATIVE AGENT, not the delivery mechanism.
+// Deaths from the same substance share a color even if the mechanism
+// differs (direct ingestion vs. cross-contamination transfer). The
+// player infers the mechanism from `lastActions` in the Death Record,
+// not from color.
+var KCN_COLOR = 0x8844CC;       // all KCN-caused deaths
 var CAUSE_COLORS = {
-  'kcn_ingestion':             0x8844CC,
-  'cross_contamination_death': 0xCC4444,
+  // KCN family — same agent, different paths
+  'kcn_ingestion':             KCN_COLOR,
+  'cross_contamination_death': KCN_COLOR,
+  // Placeholders for future, fundamentally different agents
   'radiation_exposure':        0x44CC44,
   'gas_inhalation':            0x4488CC,
   'unknown':                   0x888888

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>647 Universe — Layer A Unit Tests</title>
+<style>
+  body { font-family: Menlo, monospace; background: #111; color: #ddd; padding: 20px; line-height: 1.5; }
+  h1 { color: #e0d4b8; font-weight: normal; letter-spacing: 0.1em; }
+  h2 { color: #a0c8f0; font-size: 1em; margin-top: 20px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+  .pass { color: #7c7; }
+  .fail { color: #e66; font-weight: bold; }
+  #summary { margin-top: 20px; padding: 12px; background: #222; border-radius: 4px; font-size: 1.1em; }
+  #summary.ok { background: #1a3a1a; }
+  #summary.bad { background: #3a1a1a; }
+  pre { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>647 Universe — Layer A Unit Tests</h1>
+<div id="out"></div>
+<div id="summary"></div>
+
+<!-- ============================================================
+     STUBS: minimal environment so cer.js runs without Three.js,
+     without DOM overlays, and without real network/localStorage.
+     ============================================================ -->
+<script>
+'use strict';
+
+// -- Test harness --------------------------------------------------------
+var TEST = { pass: 0, fail: 0, sections: [] };
+var _currentSection = null;
+
+function section(name) {
+  _currentSection = { name: name, results: [] };
+  TEST.sections.push(_currentSection);
+}
+function assert(cond, name, detail) {
+  var r = { ok: !!cond, name: name, detail: detail || '' };
+  _currentSection.results.push(r);
+  if (cond) TEST.pass++; else TEST.fail++;
+}
+function assertEq(actual, expected, name) {
+  var ok = (actual === expected) ||
+           (typeof actual === 'number' && typeof expected === 'number' &&
+            Math.abs(actual - expected) < 1e-6);
+  assert(ok, name, ok ? '' : 'expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(actual));
+}
+
+// -- Minimal globals cer.js expects -------------------------------------
+var G = window.G = {
+  notebook: null,
+  gameTime: 0,
+  lang: 'en'
+};
+
+// Tiny L() that returns the key (tests don't care about translations)
+function L(key, params) {
+  if (!params) return key;
+  var s = key;
+  for (var k in params) s = s.replace('{' + k + '}', params[k]);
+  return s;
+}
+
+// Stubs for cer.js dependencies
+function saveGame() {}
+function showDiscoveryNotification(txt) {}
+function renderNotebook() {}
+var IS_LOCAL = false;
+var LOCAL_CONFIG = {};  // no API key → cer.js uses offline grader path
+
+// Fetch stub — any test that triggers the holistic grader will monkey-patch
+window.fetch = function() {
+  return Promise.reject(new Error('fetch not stubbed in this test'));
+};
+
+// Helper: fresh notebook in the shape initNotebook() produces
+function freshNotebook() {
+  return {
+    entries: [],
+    deaths: [],
+    discoveries: [],
+    totalCharacters: 0,
+    currentCharacter: null,
+    tombstoneDialogue: [],
+    cerEntries: [],
+    validatedClaims: [],
+    observedBerryStages: {},
+    skyObservations: [],
+    dayNightCycles: 0,
+    lastCycleMark: 0,
+    pbcCrossed: false,
+    thermometerLocations: [],
+    berryCleanEatenSurvived: false,
+    crossContaminationDeathSeen: false
+  };
+}
+</script>
+
+<!-- Load cer.js for real. -->
+<script src="../js/cer.js"></script>
+
+<!-- Inline Q10 math copied from substances.js (avoids loading THREE) -->
+<script>
+var G_DECAY_Q10 = 2;
+var G_DECAY_REF_TEMP = 20;
+function getDecayRate(temperature) {
+  return Math.pow(G_DECAY_Q10, (temperature - G_DECAY_REF_TEMP) / 10);
+}
+</script>
+
+<!-- ============================================================
+     TESTS
+     ============================================================ -->
+<script>
+'use strict';
+
+// ========== 1. EVIDENCE GATES — one claim at a time ==========
+section('Evidence gates (14 claims)');
+
+(function claim1() {
+  G.notebook = freshNotebook();
+  assert(!evidenceGateMet(1), 'Claim 1: no deaths → locked');
+  G.notebook.deaths.push({ causeId: 'kcn_ingestion' });
+  assert(evidenceGateMet(1), 'Claim 1: KCN death → unlocked');
+})();
+
+(function claim2() {
+  G.notebook = freshNotebook();
+  assert(!evidenceGateMet(2), 'Claim 2: no smell+death → locked');
+  G.notebook.entries.push({ action: 'smell', target: 'White Powder', result: 'bitter almond', timestamp: 1, characterName: 'A', location: 'r1' });
+  assert(!evidenceGateMet(2), 'Claim 2: smell only → locked');
+  G.notebook.deaths.push({ causeId: 'kcn_ingestion' });
+  assert(evidenceGateMet(2), 'Claim 2: smell + KCN death → unlocked');
+})();
+
+(function claim3() {
+  G.notebook = freshNotebook();
+  assert(!evidenceGateMet(3), 'Claim 3: no clean-berry survival → locked');
+  G.notebook.berryCleanEatenSurvived = true;
+  assert(evidenceGateMet(3), 'Claim 3: clean berry survived → unlocked');
+})();
+
+(function claim4() {
+  G.notebook = freshNotebook();
+  assert(!evidenceGateMet(4), 'Claim 4: no berry observations → locked');
+  G.notebook.observedBerryStages['b1'] = { stages: [0] };
+  assert(!evidenceGateMet(4), 'Claim 4: one stage → locked');
+  G.notebook.observedBerryStages['b1'].stages.push(2);
+  assert(evidenceGateMet(4), 'Claim 4: two stages → unlocked');
+})();
+
+(function claim5and7() {
+  G.notebook = freshNotebook();
+  assert(!evidenceGateMet(5), 'Claim 5: no thermometer readings → locked');
+  assert(!evidenceGateMet(7), 'Claim 7: no thermometer readings → locked');
+  G.notebook.thermometerLocations = ['above'];
+  assert(!evidenceGateMet(5), 'Claim 5: only above → locked');
+  G.notebook.thermometerLocations.push('below');
+  assert(evidenceGateMet(5), 'Claim 5: above+below → unlocked');
+  assert(evidenceGateMet(7), 'Claim 7: above+below → unlocked');
+})();
+
+(function claim6() {
+  G.notebook = freshNotebook();
+  assert(!evidenceGateMet(6), 'Claim 6: no cross-contam death seen → locked');
+  G.notebook.crossContaminationDeathSeen = true;
+  assert(evidenceGateMet(6), 'Claim 6: cross-contam death seen → unlocked');
+})();
+
+(function claim8() {
+  G.notebook = freshNotebook();
+  assert(!evidenceGateMet(8), 'Claim 8: no cycles/obs → locked');
+  G.notebook.dayNightCycles = 2;
+  assert(!evidenceGateMet(8), 'Claim 8: cycles but no obs → locked');
+  G.notebook.skyObservations = [{isNight:false},{isNight:true},{isNight:true}];
+  assert(evidenceGateMet(8), 'Claim 8: 2 cycles + 3 obs → unlocked');
+})();
+
+(function claim9() {
+  G.notebook = freshNotebook();
+  G.notebook.dayNightCycles = 1;
+  assert(!evidenceGateMet(9), 'Claim 9: 1 cycle → locked');
+  G.notebook.dayNightCycles = 2;
+  assert(evidenceGateMet(9), 'Claim 9: 2 cycles → unlocked');
+})();
+
+(function claim10and11() {
+  G.notebook = freshNotebook();
+  assert(!evidenceGateMet(10), 'Claim 10: pbc not crossed → locked');
+  assert(!evidenceGateMet(11), 'Claim 11: pbc not crossed → locked');
+  G.notebook.pbcCrossed = true;
+  assert(evidenceGateMet(10), 'Claim 10: pbc crossed → unlocked');
+  assert(evidenceGateMet(11), 'Claim 11: pbc crossed → unlocked');
+})();
+
+(function claim12and13() {
+  G.notebook = freshNotebook();
+  assert(!evidenceGateMet(12), 'Claim 12: no night obs → locked');
+  assert(!evidenceGateMet(13), 'Claim 13: no night obs → locked');
+  G.notebook.skyObservations = [{isNight:false}];
+  assert(!evidenceGateMet(12), 'Claim 12: only day obs → locked');
+  G.notebook.skyObservations.push({isNight:true});
+  assert(evidenceGateMet(12), 'Claim 12: night obs present → unlocked');
+  assert(evidenceGateMet(13), 'Claim 13: night obs present → unlocked');
+})();
+
+(function claim14() {
+  G.notebook = freshNotebook();
+  // Claim 14 has an external evidence gate — always open.
+  assert(evidenceGateMet(14), 'Claim 14: external gate → always evidence-ready');
+})();
+
+// ========== 2. matchClaimId lexical router ==========
+section('matchClaimId lexical router');
+
+assertEq(matchClaimId('the white powder is KCN'), 2, 'KCN → 2');
+assertEq(matchClaimId('cross-contamination from the door handle'), 6, 'cross-contam → 6');
+assertEq(matchClaimId('berry is safe to eat'), 3, 'berry safe → 3');
+assertEq(matchClaimId('the world loops back on itself'), 10, 'loop → 10');
+assertEq(matchClaimId('the world is flat, no horizon curvature'), 11, 'flat → 11');
+assertEq(matchClaimId('Orion is visible at night'), 12, 'Orion → 12');
+assertEq(matchClaimId('this is the northern hemisphere'), 13, 'northern → 13');
+assertEq(matchClaimId('latitude is 40°N'), 14, 'latitude → 14');
+assertEq(matchClaimId('the berry passes through stages of decay'), 4, 'decay → 4');
+assertEq(matchClaimId('temperature affects things'), 5, 'temperature → 5');
+assertEq(matchClaimId('the moon is faster than the stars'), 8, 'celestial speed → 8');
+assertEq(matchClaimId('random gibberish about nothing'), null, 'gibberish → null');
+assertEq(matchClaimId(''), null, 'empty → null');
+assertEq(matchClaimId(null), null, 'null → null');
+// Chinese routing
+assertEq(matchClaimId('氰化钾'), 2, 'zh: 氰化钾 → 2');
+assertEq(matchClaimId('交叉污染'), 6, 'zh: 交叉污染 → 6');
+assertEq(matchClaimId('回到原点'), 10, 'zh: 回到原点 → 10');
+
+// ========== 3. Scaffolded onboarding ==========
+section('Scaffolded onboarding entries');
+
+(function seeds() {
+  G.notebook = freshNotebook();
+  seedScaffoldedCerEntries();
+  assertEq(G.notebook.cerEntries.length, 3, 'seeds: exactly 3 entries');
+  var e1 = G.notebook.cerEntries[0], e2 = G.notebook.cerEntries[1], e3 = G.notebook.cerEntries[2];
+  assert(e1.claim && e1.evidence && e1.reasoning, 'seed 1: fully populated');
+  assert(e2.claim && e2.evidence && !e2.reasoning, 'seed 2: claim+evidence, reasoning blank');
+  assert(!e3.claim && e3.evidence && !e3.reasoning, 'seed 3: only evidence');
+  assertEq(e1.claimId, 1, 'seed 1 → claim 1');
+  assertEq(e2.claimId, 3, 'seed 2 → claim 3');
+  assertEq(e3.claimId, 6, 'seed 3 → claim 6');
+  assert(e1.scaffolded && e2.scaffolded && e3.scaffolded, 'all seeds flagged scaffolded');
+
+  // Idempotence
+  seedScaffoldedCerEntries();
+  assertEq(G.notebook.cerEntries.length, 3, 'seeds: idempotent (no duplicates)');
+})();
+
+// ========== 4. finalizeCer behaviour ==========
+section('finalizeCer validation side-effects');
+
+(function finalizePass() {
+  G.notebook = freshNotebook();
+  G.notebook.deaths.push({ causeId: 'kcn_ingestion' });
+  var entry = { claimId: 1, claim: 'c', evidence: 'e', reasoning: 'r', validated: false, tier: 1 };
+  G.notebook.cerEntries.push(entry);
+  finalizeCer(entry, true, 'ok');
+  assert(entry.validated === true, 'pass: entry.validated true');
+  assertEq(G.notebook.validatedClaims.length, 1, 'pass: validatedClaims +1');
+  assertEq(G.notebook.validatedClaims[0], 1, 'pass: validatedClaims[0]=1');
+  assert(entry._feedback.indexOf('✓') === 0, 'pass: feedback starts with ✓');
+
+  // Submitting same claim again must not duplicate
+  var entry2 = { claimId: 1, claim: 'c', evidence: 'e', reasoning: 'r', validated: false, tier: 1 };
+  G.notebook.cerEntries.push(entry2);
+  finalizeCer(entry2, true, 'ok');
+  assertEq(G.notebook.validatedClaims.length, 1, 'pass: duplicate claim not re-pushed');
+})();
+
+(function finalizeFail() {
+  G.notebook = freshNotebook();
+  var entry = { claimId: 1, claim: 'c', evidence: 'e', reasoning: 'r', validated: false, tier: 1 };
+  finalizeCer(entry, false, 'sharpen it');
+  assert(entry.validated === false, 'fail: entry.validated false');
+  assertEq(G.notebook.validatedClaims.length, 0, 'fail: no claim pushed');
+  assert(entry._feedback.indexOf('✗') === 0, 'fail: feedback starts with ✗');
+})();
+
+// ========== 5. submitCerEntry guard rails ==========
+section('submitCerEntry guards');
+
+(function guards() {
+  G.notebook = freshNotebook();
+
+  var missing = { claim: '', evidence: '', reasoning: '', validated: false };
+  G.notebook.cerEntries.push(missing);
+  submitCerEntry(missing);
+  assert(!missing.validated, 'guard: empty entry not validated');
+  assert(/fill|incomplete/i.test(missing._feedback), 'guard: incomplete feedback set');
+
+  var noMatch = { claim: 'asdf qwerty', evidence: 'zxcv', reasoning: 'hjkl', validated: false };
+  G.notebook.cerEntries.push(noMatch);
+  submitCerEntry(noMatch);
+  assert(!noMatch.validated, 'guard: unroutable claim not validated');
+
+  var noEvidence = { claim: 'the white powder is KCN', evidence: 'x', reasoning: 'y', validated: false, claimId: null };
+  G.notebook.cerEntries.push(noEvidence);
+  submitCerEntry(noEvidence);
+  assert(!noEvidence.validated, 'guard: gate unmet → not validated');
+  assert(/evidence|investigat/i.test(noEvidence._feedback), 'guard: gate-unmet feedback');
+})();
+
+// ========== 6. Q10 decay math ==========
+section('Berry Q10 decay math');
+
+assertEq(getDecayRate(20), 1.0, 'Q10: rate at 20°C = 1');
+assertEq(getDecayRate(30), 2.0, 'Q10: rate at 30°C = 2');
+assertEq(getDecayRate(10), 0.5, 'Q10: rate at 10°C = 0.5');
+assert(Math.abs(getDecayRate(26) - Math.pow(2, 0.6)) < 1e-6, 'Q10: rate at 26°C = 2^0.6');
+
+// ========== 7. CLAIM_DEFS shape ==========
+section('CLAIM_DEFS integrity');
+
+assertEq(CLAIM_DEFS.length, 14, '14 claims defined');
+(function integrity() {
+  var ids = {}, tiers = {1:0,2:0,3:0,4:0,5:0,6:0};
+  for (var i = 0; i < CLAIM_DEFS.length; i++) {
+    var d = CLAIM_DEFS[i];
+    assert(typeof d.id === 'number', 'claim ' + i + ' has numeric id');
+    assert(!ids[d.id], 'claim ' + d.id + ' id is unique');
+    assert(typeof d.evidence === 'function', 'claim ' + d.id + ' has evidence fn');
+    assert(typeof d.rubric === 'string' && d.rubric.length > 20, 'claim ' + d.id + ' has rubric');
+    assert(d.tier >= 1 && d.tier <= 6, 'claim ' + d.id + ' tier in 1..6');
+    ids[d.id] = true;
+    tiers[d.tier]++;
+  }
+  // GDD tier counts: T1=2, T2=1, T3=2, T4=3, T5=3, T6=3
+  assertEq(tiers[1], 2, 'Tier 1 has 2 claims');
+  assertEq(tiers[2], 1, 'Tier 2 has 1 claim');
+  assertEq(tiers[3], 2, 'Tier 3 has 2 claims');
+  assertEq(tiers[4], 3, 'Tier 4 has 3 claims');
+  assertEq(tiers[5], 3, 'Tier 5 has 3 claims');
+  assertEq(tiers[6], 3, 'Tier 6 has 3 claims');
+})();
+
+// ========== RENDER RESULTS ==========
+(function render() {
+  var out = document.getElementById('out');
+  var html = '';
+  for (var i = 0; i < TEST.sections.length; i++) {
+    var sec = TEST.sections[i];
+    html += '<h2>' + sec.name + '</h2>';
+    for (var j = 0; j < sec.results.length; j++) {
+      var r = sec.results[j];
+      var cls = r.ok ? 'pass' : 'fail';
+      var mark = r.ok ? '✓' : '✗';
+      html += '<div class="' + cls + '">' + mark + ' ' + r.name +
+              (r.detail ? '  <span style="color:#999">— ' + r.detail + '</span>' : '') + '</div>';
+    }
+  }
+  out.innerHTML = html;
+  var sum = document.getElementById('summary');
+  sum.className = TEST.fail === 0 ? 'ok' : 'bad';
+  sum.innerHTML = (TEST.fail === 0 ? '✓ ALL PASS' : '✗ FAILURES') +
+                  ' — ' + TEST.pass + ' passed, ' + TEST.fail + ' failed.';
+  // Also log to console for automation
+  if (TEST.fail === 0) console.log('TESTS PASS: ' + TEST.pass);
+  else                 console.error('TESTS FAIL: ' + TEST.fail + ' / ' + (TEST.pass + TEST.fail));
+})();
+</script>
+</body>
+</html>

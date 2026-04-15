@@ -84,6 +84,10 @@ function triggerDeath(message, causeId) {
   };
   G.notebook.deaths.push(deathRecord);
 
+  if (causeId === 'cross_contamination_death') {
+    G.notebook.crossContaminationDeathSeen = true;
+  }
+
   // Place gravestone on PBC boundary ring
   createDeathGravestone(deathRecord);
 

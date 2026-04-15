@@ -311,6 +311,27 @@ function createRoom2(center, y) {
   grate.rotation.x = -Math.PI / 2;
   grate.position.set(cx - 1.0, y + 0.015, cz + 1.0);
   G.scene.add(grate); G.roomMeshes.push(grate);
+
+  // Thermometer on wall (underground reading — evidence for claims #5, #7)
+  var tBody = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.32, 0.02),
+    new THREE.MeshStandardMaterial({ color: 0xeeeee4, roughness: 0.7 })
+  );
+  tBody.position.set(cx + 1.6, y + 1.5, cz);
+  tBody.userData.interactable = true;
+  tBody.userData.type = 'thermometer';
+  tBody.userData.nameKey = 'obj.thermometer';
+  tBody.userData.name = L('obj.thermometer');
+  tBody.userData.roomKey = 'obj.room1';
+  tBody.userData.room = L('obj.room1');
+  G.scene.add(tBody); G.roomMeshes.push(tBody);
+  G.interactables.push(tBody);
+  var tBulb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.03, 8, 8),
+    new THREE.MeshStandardMaterial({ color: 0x3388cc, roughness: 0.4 })
+  );
+  tBulb.position.set(cx + 1.6, y + 1.34, cz);
+  G.scene.add(tBulb); G.roomMeshes.push(tBulb);
 }
 
 // ===================== ROOM DETECTION =====================
