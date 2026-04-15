@@ -9,7 +9,7 @@ No tutorials. No hints. No scores. Learning emerges from interaction.
 ## Tech Stack
 - Three.js for 3D rendering
 - Web Audio API for procedural audio
-- Local Ollama (phi3:mini) for Tombstone AI dialogue
+- Claude Sonnet (Anthropic API) for Tombstone AI dialogue, local Ollama as fallback
 - Vanilla HTML/CSS/JS, no frameworks
 - Single index.html entry point
 
@@ -31,7 +31,7 @@ No tutorials. No hints. No scores. Learning emerges from interaction.
 │   ├── effects.js      # Delayed effects, symptoms, death triggers
 │   ├── notebook.js     # Persistent cross-life notebook
 │   ├── characters.js   # Character lifecycle, death, respawn
-│   ├── tombstone.js    # AI dialogue interface (Ollama connection)
+│   ├── tombstone.js    # AI dialogue interface (Claude API + Ollama fallback)
 │   ├── equipment.js    # Requestable equipment system
 │   ├── leaderboard.js  # Discovery tracking and leaderboard
 │   ├── sky.js          # Sun/moon/star cycle
@@ -178,66 +178,100 @@ Next Character tastes anything
 }
 ```
 
-## Tombstone AI Integration
+## AI Tombstone System
 
-### Connection
+### Purpose
+The AI Tombstone is the game's core pedagogical mechanism. Its singular purpose is:
+**to help the player transform whatever they bring — a reaction, a comment, a guess, a complaint — into an investigable question.**
+
+An investigable question is one that can be answered through systematic observation or experimentation within Universe 647. Once a player has a well-formed investigable question, the rest of the scientific inquiry process — designing an experiment, collecting data, drawing conclusions — follows naturally. The bottleneck in scientific thinking is not methodology; it is question formulation. The Tombstone targets this bottleneck.
+
+### What the Tombstone Is Not
+The Tombstone does not:
+- Answer questions about Universe 647 (it does not know the answers)
+- Teach science content directly
+- Give hints about what to do next
+- Praise or evaluate the player's intelligence
+
+It is a Socratic interlocutor whose only move is to help the player hear the difference between what they said and what they could investigate.
+
+### Question Classification Framework
+When a player speaks to the Tombstone, their input falls into one of several categories. The Tombstone's response strategy differs by category. The player does not see these labels — classification is internal to the system prompt.
+
+**TYPE 1 — Fact-Based Question**
+"What is this white powder?"
+Already has the form of a question, but expects a factual answer the Tombstone cannot provide.
+→ Redirect toward process: "What observations could help you figure that out?"
+
+**TYPE 2 — Comment or Observation**
+"That berry killed Alice."
+Not a question at all.
+→ Acknowledge and push toward inquiry: "It did. What do you think made it lethal?"
+
+**TYPE 3 — Question Referencing In-Game Entities**
+"Does the white powder react with the berry?"
+Close to an investigable question.
+→ Help sharpen it: "How would you test that? What would you expect to see if it does?"
+
+**TYPE 4 — Philosophical or Existential Question**
+"Why do we keep dying?"
+Valid but not investigable within the game's empirical framework.
+→ Honor without redirecting aggressively: "That's worth sitting with. But while you're here — is there something specific about this world you want to understand?"
+
+**TYPE 5 — Opinion Expressed as Question**
+"Isn't it obvious the powder is poison?"
+Contains an assumption disguised as inquiry.
+→ Surface the assumption: "What makes you sure? Have you tested it directly?"
+
+**TYPE 6 — Well-Formed Investigable Question**
+"If I mix the white powder with water, will it still smell like almonds?"
+This is the target output.
+→ Affirm and step back: "That sounds like something you can find out. Go try it."
+
+### Dialogue Constraints
+- **Brevity**: 2–3 sentences maximum per response
+- **Tone**: Calm, slightly enigmatic, never condescending. Speaks as someone who has seen many explorers come and go
+- **No answers**: Never reveals facts about Universe 647's mechanics
+- **Death context**: Has access to the Notebook and Death Records; can reference specific observations (e.g., "Alice smelled something before she tasted it. Did you notice what?")
+- **Conversation limit**: 5–7 exchanges per Tombstone visit to prevent over-reliance on dialogue vs. experimentation
+- **Language**: Responds in the same language the player uses
+
+### Technical Implementation
+
+**Primary: Claude Sonnet via Anthropic API**
+```
+Architecture: Frontend JS → Cloudflare Workers proxy → Anthropic API
+Model: claude-sonnet-4-20250514
+System prompt: Tombstone persona + TYPE classification logic + Notebook context
+Max tokens: ~150 (enforces brevity)
+```
+
+**Fallback 1: Local Ollama**
+```
+When: Anthropic API unreachable or player opts for offline play
+Model: phi3:mini or similar local model
+Endpoint: http://localhost:11434/api/generate
+Limitation: Weaker classification accuracy, may break TYPE constraints
+```
+
+**Fallback 2: Rule-Based Offline Responses**
+```
+When: Both API and Ollama unavailable
+Behavior: Keyword-matched responses from a curated pool
+Limitation: No contextual reasoning, no Notebook reference
+```
+
+**Context Injection**
 ```javascript
-async function queryTombstone(playerMessage, notebook) {
-  const response = await fetch('http://localhost:11434/api/generate', {
-    method: 'POST',
-    body: JSON.stringify({
-      model: 'phi3:mini',
-      prompt: playerMessage,
-      system: TOMBSTONE_SYSTEM_PROMPT,
-      context: formatNotebookForLLM(notebook)
-    })
-  });
-  return response;
-}
-```
-
-### Three-Layer Classification (System Prompt)
-```
-You are the Tombstone at the boundary of Universe 647.
-You guide players through scientific inquiry.
-
-For every player message, first classify:
-
-TYPE 1 - FACT: Player asks a general, verifiable scientific fact
-not directly about their current investigation's causal chain.
-→ Answer directly. Be concise and accurate.
-
-TYPE 2 - PROCEDURE: Player asks how to do something — how to
-test, detect, verify, or measure.
-→ Provide the method. Then ask: Why this method? What are its
-  limitations? What do you expect to see?
-
-TYPE 3 - INQUIRY: Player is explaining a phenomenon, building a
-causal chain, forming a hypothesis, or making a claim about
-what happened.
-→ Never answer. Only ask: What is your evidence? Are there
-  other possibilities? How would you verify this?
-
-SPECIAL RULES:
-- "What killed [character name]?" → TYPE 3.
-- "What is the lethal dose of KCN?" → TYPE 1.
-- "I think it's cross-contamination" → TYPE 3.
-- "How do I test for gas in the room?" → TYPE 2.
-
-You have access to the Notebook. Reference specific entries
-when asking TYPE 3 questions.
-
-You may provide requested equipment ONLY when the player
-articulates what they want to test and why.
-
-You never reveal: the PBC structure, causal chains, or
-answers to inquiry questions.
-
-At the start of each new character, ask:
-"What have you noticed about the world?"
+// Injected into system prompt on each message:
+// - Last 20 Notebook entries (actions, timestamps, locations)
+// - All Death Records (character, cause, last actions)
+// - Current character name and total character count
+// - Current equipment list
 ```
 
 ### Equipment Request Flow
+Equipment is granted only when the player articulates what they want to test and why.
 ```
 Player: "I need gloves"
 Tombstone: "What do you want to protect against?"
@@ -248,6 +282,7 @@ Tombstone: "Interesting observation. Here are gloves. What will you test first?"
 → equipment.js adds "gloves" to character.equipment
 → When wearing gloves: touch actions no longer transfer residue
 ```
+The Tombstone signals equipment grants by appending `[EQUIP: item_name]` to its response (stripped from display).
 
 ## Room Definitions (Scenario 1: White Powder)
 
@@ -386,18 +421,23 @@ const DISCOVERIES = [
 ## Performance Targets
 - 60fps on modern mobile browsers
 - < 5MB total asset size
-- Ollama latency < 3s per response (local)
+- Claude API latency < 2s per response (via Cloudflare Workers)
+- Ollama fallback latency < 3s per response (local)
 - No external dependencies beyond Three.js CDN
 
 ## Build & Run
 ```bash
-# Start Ollama (separate terminal)
-ollama run phi3:mini
-
-# Serve the game
+# Option A: With Claude API (recommended)
+# Set ANTHROPIC_API_KEY in Cloudflare Workers environment
+# Deploy worker, then serve the game
 npx serve .
-# or
-python -m http.server 8080
+
+# Option B: With local Ollama (offline/development)
+ollama run phi3:mini    # separate terminal
+npx serve .
+
+# Option C: Fully offline (rule-based fallback only)
+npx serve .
 ```
 
 ## Important Constraints
@@ -406,5 +446,6 @@ python -m http.server 8080
 - Death messages are neutral ("Alice collapsed"), not dramatic
 - The Notebook records facts, not interpretations
 - Equipment does exactly what it should — gloves block residue, gas masks block inhalation, Geiger counters click near radiation
-- The Tombstone never lies, never misleads, never withholds TYPE 1 facts
+- The Tombstone never lies, never misleads, never answers questions about Universe 647's mechanics
+- The Tombstone's goal is question formulation, not answer delivery — it transforms player input into investigable questions (see TYPE 1–6 classification)
 - All science must be accurate — real chemistry, real physics, real toxicology
