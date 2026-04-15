@@ -1,6 +1,10 @@
 'use strict';
 
 // ===================== TOMBSTONE AI DIALOGUE =====================
+
+var IS_LOCAL = window.location.hostname === 'localhost' ||
+               window.location.hostname === '127.0.0.1';
+
 var TOMBSTONE_SYSTEM_PROMPT = [
   'You are the Tombstone at the boundary of Universe 647.',
   'You guide players through scientific inquiry.',
@@ -49,9 +53,13 @@ var TOMBSTONE_SYSTEM_PROMPT = [
   'Keep responses under 3 sentences.'
 ].join('\n');
 
+// Conversation history for Claude Sonnet (role alternation required)
+var tombConversationHistory = [];
+
 function initTombstoneChat() {
   G.tombChatInited = false;
   G.tombGreetingShown = false;
+  tombConversationHistory = [];
 }
 
 function updateTombstoneChat() {
@@ -94,8 +102,6 @@ function sendTombstoneMsg(msg) {
   // Store in notebook
   G.notebook.tombstoneDialogue.push(msg);
   addNotebookEntry('tombstone dialogue', 'Tombstone', 'PBC Boundary', 'Said: "' + msg + '"');
-
-  // Check leaderboard conditions
   checkLeaderboardConditions();
 
   appendChatMsg('user', msg);
@@ -108,9 +114,95 @@ function sendTombstoneMsg(msg) {
   msgsEl.appendChild(aDiv);
   msgsEl.scrollTop = msgsEl.scrollHeight;
 
-  // Build context from notebook
-  var context = formatNotebookForLLM();
+  if (IS_LOCAL && typeof LOCAL_CONFIG !== 'undefined' && LOCAL_CONFIG.ANTHROPIC_API_KEY &&
+      LOCAL_CONFIG.ANTHROPIC_API_KEY.indexOf('sk-ant-') === 0 &&
+      LOCAL_CONFIG.ANTHROPIC_API_KEY.length > 20) {
+    sendToClaudeSonnet(msg, aDiv, msgsEl);
+  } else {
+    sendToOllama(msg, aDiv, msgsEl);
+  }
+}
 
+// ===================== CLAUDE SONNET (LOCAL) =====================
+
+function buildSystemWithContext() {
+  return TOMBSTONE_SYSTEM_PROMPT + '\n\n--- NOTEBOOK CONTEXT ---\n' + formatNotebookForLLM();
+}
+
+function sendToClaudeSonnet(msg, aDiv, msgsEl) {
+  // Add user message to history
+  tombConversationHistory.push({ role: 'user', content: msg });
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': LOCAL_CONFIG.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 200,
+      system: buildSystemWithContext(),
+      messages: tombConversationHistory,
+      stream: true
+    })
+  }).then(function(res) {
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder();
+    var fullResponse = '';
+    aDiv.textContent = '';
+
+    function read() {
+      reader.read().then(function(result) {
+        if (result.done) {
+          // Strip equipment tags before storing
+          var clean = fullResponse.replace(/\[EQUIP:.*?\]/g, '').trim();
+          // Add assistant turn to history
+          tombConversationHistory.push({ role: 'assistant', content: fullResponse });
+          // Keep history bounded (last 20 turns = 10 exchanges)
+          if (tombConversationHistory.length > 20) {
+            tombConversationHistory = tombConversationHistory.slice(-20);
+          }
+          processEquipment(fullResponse);
+          G.notebook.tombstoneDialogue.push('[Tombstone]: ' + clean);
+          checkLeaderboardConditions();
+          return;
+        }
+        var chunk = decoder.decode(result.value, { stream: true });
+        var lines = chunk.split('\n');
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (!line || line === 'data: [DONE]') continue;
+          if (line.indexOf('data: ') === 0) {
+            try {
+              var json = JSON.parse(line.slice(6));
+              if (json.type === 'content_block_delta' && json.delta && json.delta.text) {
+                fullResponse += json.delta.text;
+                var display = fullResponse.replace(/\[EQUIP:.*?\]/g, '').trim();
+                aDiv.innerHTML = display.replace(/\n/g, '<br>');
+                msgsEl.scrollTop = msgsEl.scrollHeight;
+              }
+            } catch(e) {}
+          }
+        }
+        read();
+      }).catch(function() {
+        fallbackReply(aDiv, msgsEl, tombConversationHistory[tombConversationHistory.length - 1].content);
+      });
+    }
+    read();
+  }).catch(function() {
+    fallbackReply(aDiv, msgsEl, msg);
+  });
+}
+
+// ===================== OLLAMA (FALLBACK) =====================
+
+function sendToOllama(msg, aDiv, msgsEl) {
+  var context = formatNotebookForLLM();
   fetch('/api/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -143,7 +235,6 @@ function sendTombstoneMsg(msg) {
             var json = JSON.parse(lines[i]);
             if (json.response) {
               fullResponse += json.response;
-              // Strip equipment tags from display
               var display = fullResponse.replace(/\[EQUIP:.*?\]/g, '').trim();
               aDiv.textContent = display;
               msgsEl.scrollTop = msgsEl.scrollHeight;
@@ -155,13 +246,18 @@ function sendTombstoneMsg(msg) {
     }
     read();
   }).catch(function() {
-    // Offline fallback
-    var reply = offlineFallback(msg);
-    aDiv.textContent = reply;
-    G.notebook.tombstoneDialogue.push('[Tombstone]: ' + reply);
-    checkLeaderboardConditions();
-    msgsEl.scrollTop = msgsEl.scrollHeight;
+    fallbackReply(aDiv, msgsEl, msg);
   });
+}
+
+// ===================== OFFLINE FALLBACK =====================
+
+function fallbackReply(aDiv, msgsEl, msg) {
+  var reply = offlineFallback(msg);
+  aDiv.textContent = reply;
+  G.notebook.tombstoneDialogue.push('[Tombstone]: ' + reply);
+  checkLeaderboardConditions();
+  msgsEl.scrollTop = msgsEl.scrollHeight;
 }
 
 function offlineFallback(msg) {
@@ -173,16 +269,16 @@ function offlineFallback(msg) {
   return replies[Math.floor(Math.random() * replies.length)];
 }
 
+// ===================== SHARED UTILITIES =====================
+
 function formatNotebookForLLM() {
   var parts = [];
-  // Last 20 entries
   var entries = G.notebook.entries;
   var start = Math.max(0, entries.length - 20);
   for (var i = start; i < entries.length; i++) {
     var e = entries[i];
     parts.push('[' + formatTime(e.timestamp) + '] ' + e.characterName + ' ' + e.action + ' ' + e.target + ' @' + e.location + ': ' + e.result);
   }
-  // All deaths
   if (G.notebook.deaths.length > 0) {
     parts.push('\n--- DEATHS ---');
     for (var d = 0; d < G.notebook.deaths.length; d++) {
