@@ -368,7 +368,7 @@ var CAUSE_COLORS = {
   'unknown':                   0x888888
 };
 
-var GRAVESTONE_RADIUS = 95;
+var GRAVESTONE_RADIUS = 19;
 var GRAVESTONE_ANGLE_START = 0.3;
 var GRAVESTONE_ANGLE_STEP = 0.35;
 
@@ -447,15 +447,20 @@ function createDeathGravestone(deathRecord) {
   var step = Math.min(GRAVESTONE_ANGLE_STEP, (2 * Math.PI - 0.6) / Math.max(totalDeaths, 1));
   var angle = GRAVESTONE_ANGLE_START + n * step;
 
-  var gx = Math.cos(angle) * GRAVESTONE_RADIUS;
-  var gz = Math.sin(angle) * GRAVESTONE_RADIUS;
+  var gx = G.TMB_X + Math.cos(angle) * GRAVESTONE_RADIUS;
+  var gz = G.TMB_Z + Math.sin(angle) * GRAVESTONE_RADIUS;
 
   var causeColor = getCauseColor(deathRecord.causeId);
 
   // Slab geometry — pivot at base
   var slabGeo = new THREE.BoxGeometry(0.6, 0.9, 0.08);
   slabGeo.translate(0, 0.45, 0);
-  var slabMat = new THREE.MeshLambertMaterial({ color: causeColor });
+  var slabMat = new THREE.MeshStandardMaterial({
+    color: causeColor,
+    emissive: causeColor,
+    emissiveIntensity: 0.4,
+    roughness: 0.8
+  });
 
   // Text plane — local Z offset to sit on slab front face
   var textTex = createGravestoneTexture(deathRecord);
@@ -476,6 +481,12 @@ function createDeathGravestone(deathRecord) {
     group.rotation.y = angle + Math.PI;  // face inward toward center
     group.add(new THREE.Mesh(slabGeo, slabMat));
     group.add(new THREE.Mesh(textGeo, textMat));
+
+    // Glow light
+    var glowLight = new THREE.PointLight(causeColor, 0.6, 4);
+    glowLight.position.set(0, 0.8, 0);
+    group.add(glowLight);
+
     G.scene.add(group);
     groups.push(group);
   }

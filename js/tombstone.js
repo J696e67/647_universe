@@ -49,6 +49,10 @@ var TOMBSTONE_SYSTEM_PROMPT = [
   'At the start of each new character, ask:',
   '"What have you noticed about the world?"',
   '',
+  'NEVER announce the classification type or say things like',
+  '"This is a factual question" or "As a TYPE 1 question...".',
+  'Classification is internal only — just respond directly.',
+  '',
   'Respond in the same language the player uses.',
   'Keep responses under 3 sentences.'
 ].join('\n');
@@ -117,8 +121,10 @@ function sendTombstoneMsg(msg) {
   if (IS_LOCAL && typeof LOCAL_CONFIG !== 'undefined' && LOCAL_CONFIG.ANTHROPIC_API_KEY &&
       LOCAL_CONFIG.ANTHROPIC_API_KEY.indexOf('sk-ant-') === 0 &&
       LOCAL_CONFIG.ANTHROPIC_API_KEY.length > 20) {
+    console.log('[Tombstone] → Claude Sonnet');
     sendToClaudeSonnet(msg, aDiv, msgsEl);
   } else {
+    console.log('[Tombstone] → offline fallback');
     sendToOllama(msg, aDiv, msgsEl);
   }
 }
