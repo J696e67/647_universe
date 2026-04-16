@@ -71,40 +71,61 @@ function evidenceGateMet(claimId) {
 
 // ===================== SCAFFOLDED ONBOARDING =====================
 // GDD §8.1 — three entries at decreasing levels of completeness.
+// Entries are NOT seeded up-front (that would dump three mysterious
+// rows into the notebook on first open). Instead each entry is
+// revealed when its triggering in-world event fires — see GDD §12.4.
+
+function _seedDef(claimId) {
+  if (claimId === 1) return {
+    id: 'cer_seed_1', claimId: 1, tier: 1,
+    claim: L('cer.seed.1.claim'),
+    evidence: L('cer.seed.1.evidence'),
+    reasoning: L('cer.seed.1.reasoning')
+  };
+  if (claimId === 3) return {
+    id: 'cer_seed_2', claimId: 3, tier: 1,
+    claim: L('cer.seed.2.claim'),
+    evidence: L('cer.seed.2.evidence'),
+    reasoning: ''
+  };
+  if (claimId === 6) return {
+    id: 'cer_seed_3', claimId: 6, tier: 4,
+    claim: '',
+    evidence: L('cer.seed.3.evidence'),
+    reasoning: ''
+  };
+  return null;
+}
+
+// Reveal one scaffolded entry on event trigger. Idempotent — if the
+// entry for that claimId already exists, return it without duplicating.
+function revealScaffoldedCerEntry(claimId) {
+  if (!G.notebook.cerEntries) G.notebook.cerEntries = [];
+  for (var i = 0; i < G.notebook.cerEntries.length; i++) {
+    var e = G.notebook.cerEntries[i];
+    if (e.scaffolded && e.claimId === claimId) return e;
+  }
+  var seed = _seedDef(claimId);
+  if (!seed) return null;
+  seed.validated = false;
+  seed.scaffolded = true;
+  G.notebook.cerEntries.push(seed);
+  return seed;
+}
+
+// Back-compat helper: seed all three at once. Kept for tests and for
+// any dev hook that wants the old behavior. NOT called by initNotebook.
 function seedScaffoldedCerEntries() {
-  if (!G.notebook.cerEntries || G.notebook.cerEntries.length > 0) return;
-  G.notebook.cerEntries = [
-    {
-      id: 'cer_seed_1',
-      claimId: 1,
-      claim: L('cer.seed.1.claim'),
-      evidence: L('cer.seed.1.evidence'),
-      reasoning: L('cer.seed.1.reasoning'),
-      validated: false,
-      tier: 1,
-      scaffolded: true
-    },
-    {
-      id: 'cer_seed_2',
-      claimId: 3,
-      claim: L('cer.seed.2.claim'),
-      evidence: L('cer.seed.2.evidence'),
-      reasoning: '',
-      validated: false,
-      tier: 1,
-      scaffolded: true
-    },
-    {
-      id: 'cer_seed_3',
-      claimId: 6,
-      claim: '',
-      evidence: L('cer.seed.3.evidence'),
-      reasoning: '',
-      validated: false,
-      tier: 4,
-      scaffolded: true
-    }
-  ];
+  revealScaffoldedCerEntry(1);
+  revealScaffoldedCerEntry(3);
+  revealScaffoldedCerEntry(6);
+}
+
+// Map a cause-of-death to its scaffolded claim id.
+function scaffoldedClaimForCause(causeId) {
+  if (causeId === 'kcn_ingestion') return 1;
+  if (causeId === 'cross_contamination_death') return 6;
+  return null;
 }
 
 // ===================== CER BOARD UI =====================
@@ -152,7 +173,7 @@ function renderCerBoard() {
   if (entries.length === 0) {
     var empty = document.createElement('div');
     empty.style.cssText = 'color:#555;text-align:center;padding:40px;';
-    empty.textContent = L('cer.empty');
+    empty.textContent = L('cer.no_claims');
     content.appendChild(empty);
     return;
   }
@@ -377,8 +398,59 @@ function finalizeCer(entry, pass, note) {
     if (G.notebook.validatedClaims.indexOf(entry.claimId) === -1) {
       G.notebook.validatedClaims.push(entry.claimId);
       showDiscoveryNotification(L('claim.' + entry.claimId + '.title'));
+
+      // GDD §12.3 Beat 6: first validation → auto-open Leaderboard once,
+      // auto-close after 6s. Strictly gated on the 0→1 transition.
+      if (G.notebook.validatedClaims.length === 1 && !G.notebook._firstValidationCelebrated) {
+        G.notebook._firstValidationCelebrated = true;
+        setTimeout(function() {
+          var nb = document.getElementById('notebook-overlay');
+          if (nb) nb.classList.remove('active');
+          if (typeof showLeaderboard === 'function') showLeaderboard();
+          setTimeout(function() {
+            var lb = document.getElementById('leaderboard-overlay');
+            if (lb) lb.classList.remove('active');
+          }, 6000);
+        }, 1500);
+      }
     }
   }
   saveGame();
   renderNotebook();
+}
+
+// Beat 6 (GDD §12.3): one-shot auto-open of the CER Board on the first
+// death of a save, 2s after respawn. Called from effects.js triggerDeath
+// respawn callback.
+function maybeTriggerBeat6(causeId) {
+  if (G.notebook._beat6Fired) return;
+  G.notebook._beat6Fired = true;
+  var claimId = scaffoldedClaimForCause(causeId);
+  if (claimId) revealScaffoldedCerEntry(claimId);
+  setTimeout(function() {
+    var btn = document.getElementById('notebook-btn');
+    if (btn) {
+      btn.classList.add('pulse');
+      setTimeout(function() { btn.classList.remove('pulse'); }, 3000);
+    }
+    NOTEBOOK_MODE = 'cer';
+    var overlay = document.getElementById('notebook-overlay');
+    if (overlay && !overlay.classList.contains('active')) {
+      renderNotebook();
+      overlay.classList.add('active');
+    } else {
+      renderNotebook();
+    }
+    // Highlight submit on the newly-revealed scaffolded entry
+    setTimeout(function() {
+      var cards = document.querySelectorAll('.cer-card');
+      for (var i = 0; i < cards.length; i++) {
+        if (!cards[i].classList.contains('validated')) {
+          var btns = cards[i].querySelectorAll('.cer-actions button');
+          if (btns.length >= 2) btns[btns.length - 1].classList.add('pulse-highlight');
+          break;
+        }
+      }
+    }, 200);
+  }, 2000);
 }

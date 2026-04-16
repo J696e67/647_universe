@@ -236,22 +236,35 @@ assertEq(matchClaimId('回到原点'), 10, 'zh: 回到原点 → 10');
 // ========== 3. Scaffolded onboarding ==========
 section('Scaffolded onboarding entries');
 
-(function seeds() {
+(function seedsBulk() {
   G.notebook = freshNotebook();
   seedScaffoldedCerEntries();
-  assertEq(G.notebook.cerEntries.length, 3, 'seeds: exactly 3 entries');
-  var e1 = G.notebook.cerEntries[0], e2 = G.notebook.cerEntries[1], e3 = G.notebook.cerEntries[2];
-  assert(e1.claim && e1.evidence && e1.reasoning, 'seed 1: fully populated');
-  assert(e2.claim && e2.evidence && !e2.reasoning, 'seed 2: claim+evidence, reasoning blank');
-  assert(!e3.claim && e3.evidence && !e3.reasoning, 'seed 3: only evidence');
-  assertEq(e1.claimId, 1, 'seed 1 → claim 1');
-  assertEq(e2.claimId, 3, 'seed 2 → claim 3');
-  assertEq(e3.claimId, 6, 'seed 3 → claim 6');
-  assert(e1.scaffolded && e2.scaffolded && e3.scaffolded, 'all seeds flagged scaffolded');
-
-  // Idempotence
+  assertEq(G.notebook.cerEntries.length, 3, 'seeds (bulk): 3 entries');
+  var by = {};
+  for (var i = 0; i < G.notebook.cerEntries.length; i++) by[G.notebook.cerEntries[i].claimId] = G.notebook.cerEntries[i];
+  assert(by[1] && by[1].claim && by[1].evidence && by[1].reasoning, 'seed claim 1: fully populated');
+  assert(by[3] && by[3].claim && by[3].evidence && !by[3].reasoning, 'seed claim 3: reasoning blank');
+  assert(by[6] && !by[6].claim && by[6].evidence && !by[6].reasoning, 'seed claim 6: only evidence');
+  assert(by[1].scaffolded && by[3].scaffolded && by[6].scaffolded, 'all seeds flagged');
   seedScaffoldedCerEntries();
-  assertEq(G.notebook.cerEntries.length, 3, 'seeds: idempotent (no duplicates)');
+  assertEq(G.notebook.cerEntries.length, 3, 'seeds (bulk): idempotent');
+})();
+
+(function revealEvent() {
+  G.notebook = freshNotebook();
+  assertEq(G.notebook.cerEntries.length, 0, 'fresh notebook has 0 entries');
+  revealScaffoldedCerEntry(1);
+  assertEq(G.notebook.cerEntries.length, 1, 'reveal 1 → 1 entry');
+  revealScaffoldedCerEntry(1);
+  assertEq(G.notebook.cerEntries.length, 1, 'reveal same twice → idempotent');
+  revealScaffoldedCerEntry(3);
+  revealScaffoldedCerEntry(6);
+  assertEq(G.notebook.cerEntries.length, 3, 'all three revealed');
+  assertEq(revealScaffoldedCerEntry(99), null, 'unknown claim → null');
+
+  assertEq(scaffoldedClaimForCause('kcn_ingestion'), 1, 'cause: kcn → 1');
+  assertEq(scaffoldedClaimForCause('cross_contamination_death'), 6, 'cause: cross → 6');
+  assertEq(scaffoldedClaimForCause('radiation_exposure'), null, 'cause: radiation → null');
 })();
 
 // ========== 4. finalizeCer behaviour ==========

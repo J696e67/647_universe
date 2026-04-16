@@ -167,20 +167,46 @@ assertEq(matchClaimId('氰化钾'), 2, 'match zh: 氰化钾 → 2');
 assertEq(matchClaimId('交叉污染'), 6, 'match zh: 交叉污染 → 6');
 assertEq(matchClaimId('回到原点'), 10, 'match zh: 回到原点 → 10');
 
-// Scaffolded seeds
+// Scaffolded seeds (bulk back-compat helper)
 G.notebook = freshNotebook();
 seedScaffoldedCerEntries();
-assertEq(G.notebook.cerEntries.length, 3, 'seeds: 3 entries');
-var e1 = G.notebook.cerEntries[0], e2 = G.notebook.cerEntries[1], e3 = G.notebook.cerEntries[2];
-assert(e1.claim && e1.evidence && e1.reasoning, 'seed 1 fully populated');
-assert(e2.claim && e2.evidence && !e2.reasoning, 'seed 2 reasoning blank');
-assert(!e3.claim && e3.evidence && !e3.reasoning, 'seed 3 only evidence');
-assertEq(e1.claimId, 1, 'seed 1 → claim 1');
-assertEq(e2.claimId, 3, 'seed 2 → claim 3');
-assertEq(e3.claimId, 6, 'seed 3 → claim 6');
-assert(e1.scaffolded && e2.scaffolded && e3.scaffolded, 'all seeds flagged');
+assertEq(G.notebook.cerEntries.length, 3, 'seeds (bulk): 3 entries');
+var bySeed = {};
+for (var s_i = 0; s_i < G.notebook.cerEntries.length; s_i++) {
+  var _e = G.notebook.cerEntries[s_i];
+  bySeed[_e.claimId] = _e;
+}
+var s1 = bySeed[1], s3 = bySeed[3], s6 = bySeed[6];
+assert(s1 && s1.claim && s1.evidence && s1.reasoning, 'seed claim 1 fully populated');
+assert(s3 && s3.claim && s3.evidence && !s3.reasoning, 'seed claim 3 reasoning blank');
+assert(s6 && !s6.claim && s6.evidence && !s6.reasoning, 'seed claim 6 only evidence');
+assert(s1.scaffolded && s3.scaffolded && s6.scaffolded, 'all seeds flagged scaffolded');
 seedScaffoldedCerEntries();
-assertEq(G.notebook.cerEntries.length, 3, 'seeds idempotent');
+assertEq(G.notebook.cerEntries.length, 3, 'seeds (bulk): idempotent');
+
+// Event-triggered reveal (GDD §12.4) — new default path
+var revealScaffoldedCerEntry = sandbox.revealScaffoldedCerEntry;
+var scaffoldedClaimForCause = sandbox.scaffoldedClaimForCause;
+
+G.notebook = freshNotebook();
+assertEq(G.notebook.cerEntries.length, 0, 'fresh notebook has no seeds');
+revealScaffoldedCerEntry(1);
+assertEq(G.notebook.cerEntries.length, 1, 'reveal claim 1 → 1 entry');
+assertEq(G.notebook.cerEntries[0].claimId, 1, 'revealed entry claim = 1');
+revealScaffoldedCerEntry(1);
+assertEq(G.notebook.cerEntries.length, 1, 'reveal same claim twice → idempotent');
+revealScaffoldedCerEntry(3);
+assertEq(G.notebook.cerEntries.length, 2, 'reveal claim 3 → 2 entries');
+revealScaffoldedCerEntry(6);
+assertEq(G.notebook.cerEntries.length, 3, 'reveal claim 6 → 3 entries');
+var unknownSeed = revealScaffoldedCerEntry(99);
+assert(unknownSeed === null, 'reveal unknown claim → null');
+
+// scaffoldedClaimForCause mapping
+assertEq(scaffoldedClaimForCause('kcn_ingestion'), 1, 'cause: kcn_ingestion → claim 1');
+assertEq(scaffoldedClaimForCause('cross_contamination_death'), 6, 'cause: cross_contam → claim 6');
+assertEq(scaffoldedClaimForCause('radiation_exposure'), null, 'cause: radiation → null');
+assertEq(scaffoldedClaimForCause('unknown'), null, 'cause: unknown → null');
 
 // finalizeCer
 G.notebook = freshNotebook();

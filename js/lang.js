@@ -7,6 +7,15 @@ en: {
   'loading.title': 'Shennong Hall',
   'loading.sub': 'Universe 647',
   'loading.tag': 'Play until you die. Play until you know why.',
+  // Opening acts (GDD §12.3 Beat 0)
+  'act1.subtitle': 'Die first. Then you may know why.',
+  'act2.subtitle': 'How much do you know about this world?',
+  // Onboarding hints (GDD §12)
+  'onboarding.walk': 'WASD to walk, mouse to look.',
+  'onboarding.walk.mobile': 'Drag left side to walk. Drag right side to look.',
+  'onboarding.house': 'Aim the crosshair at an object, then try the five sense buttons.',
+  'onboarding.released': 'Something outside has changed.',
+  'cer.no_claims': 'No claims yet. Play, die, come back.',
   // Title
   'game.title': 'Universe 647',
   // Hints
@@ -226,6 +235,15 @@ zh: {
   'loading.title': '\u795E\u519C\u5802',
   'loading.sub': '647\u53F7\u5B87\u5B99',
   'loading.tag': '\u6B7B\u53BB\uFF0C\u624D\u80FD\u77E5\u9053\u4E3A\u4EC0\u4E48\u3002',
+  // Opening acts (GDD §12.3 Beat 0)
+  'act1.subtitle': '\u6B7B\u53BB\u624D\u80FD\u77E5\u9053\u4E3A\u4EC0\u4E48',
+  'act2.subtitle': '\u4F60\u5BF9\u8FD9\u4E2A\u4E16\u754C\u4E86\u89E3\u591A\u5C11\uFF1F',
+  // Onboarding hints (GDD §12)
+  'onboarding.walk': 'WASD \u79FB\u52A8\uFF0C\u9F20\u6807\u8F6C\u5411\u3002',
+  'onboarding.walk.mobile': '\u5DE6\u4FA7\u62D6\u52A8\u79FB\u52A8\uFF0C\u53F3\u4FA7\u62D6\u52A8\u8F6C\u5411\u3002',
+  'onboarding.house': '\u51C6\u5FC3\u5BF9\u51C6\u7269\u4F53\uFF0C\u8BD5\u8BD5\u4E94\u4E2A\u611F\u5B98\u6309\u94AE\u3002',
+  'onboarding.released': '\u5916\u9762\u6709\u4EC0\u4E48\u4E0D\u4E00\u6837\u7684\u53D1\u751F\u4E86\u3002',
+  'cer.no_claims': '\u8FD8\u6CA1\u6709\u4E3B\u5F20\u3002\u53BB\u73A9\uFF0C\u53BB\u6B7B\uFF0C\u518D\u56DE\u6765\u3002',
   // Title
   'game.title': '647\u53F7\u5B87\u5B99',
   // Hints

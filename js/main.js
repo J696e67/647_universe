@@ -34,7 +34,11 @@ var G = window.G = {
 
   // Player state
   px: 0, pz: 8, yaw: 1.83, pitch: 0.05,
-  TIME_OFFSET: 94,
+  // TIME_OFFSET controls the initial time-of-day at spawn (seconds into
+  // the CYCLE). 100 ≈ sun at ~5° altitude (golden hour, just about to
+  // set). Player watches sunset unfold as they walk toward the house;
+  // by the time they arrive the house lamps are the brightest feature.
+  TIME_OFFSET: 100,
   inMaze: false,
   mpx: 0, mpz: 0,
   savedOutdoorPos: { x: 0, z: 0, yaw: 0 },
@@ -229,6 +233,10 @@ function init() {
   // Init anti-stuck
   initAntiStuck();
 
+  // Init onboarding state machine (GDD §12). Must happen AFTER loadGame
+  // so saved `onboardingComplete` flag is honored.
+  initOnboarding();
+
   // Init death gravestones from any existing deaths
   initDeathGravestones();
 
@@ -263,34 +271,51 @@ function init() {
         }
         initMazeAudio();
       }
-      // Show title
+      // Title cards (GDD §12.3 Beat 0)
+      // Act 1: 神农堂 / 死去才能知道为什么          (2.5s)
+      // Act 2: 647 宇宙 / 你对这个世界了解多少？     (2.5s)
+      // Returning players (onboardingComplete === true) skip both.
       var titleEl = document.getElementById('title');
       var subEl = document.getElementById('subtitle');
-      titleEl.style.opacity = '1';
-      titleEl.style.transition = 'opacity 1.5s';
-      subEl.textContent = L('loading.tag');
-      subEl.style.opacity = '1';
-      subEl.style.transition = 'opacity 1.5s';
-      setTimeout(function() {
-        titleEl.style.opacity = '0';
-        subEl.style.opacity = '0';
+      titleEl.style.transition = 'opacity 0.6s';
+      subEl.style.transition = 'opacity 0.6s';
+
+      function showGameHud() {
+        titleEl.style.display = 'none';
+        subEl.style.display = 'none';
+        document.getElementById('char-name').style.opacity = '1';
+        document.getElementById('notebook-btn').style.opacity = '1';
+        document.getElementById('lang-btn').style.opacity = '1';
+        document.getElementById('crosshair').style.opacity = '1';
+        if (typeof onboardingEnterWalkStage === 'function') onboardingEnterWalkStage();
+      }
+
+      if (G.onboardingComplete) {
+        // Returning player: skip both acts
+        showGameHud();
+      } else {
+        // Act 1
+        titleEl.textContent = L('loading.title');
+        subEl.textContent = L('act1.subtitle');
+        titleEl.style.opacity = '1';
+        subEl.style.opacity = '1';
         setTimeout(function() {
-          titleEl.style.display = 'none';
-          subEl.style.display = 'none';
-          // Show hint
-          if (!G.hintShown) {
-            var isMobile = 'ontouchstart' in window;
-            G.hintEl.textContent = isMobile ? L('hint.mobile') : L('hint.desktop');
-            G.hintEl.style.opacity = '1';
-            setTimeout(function() { G.hintEl.style.opacity = '0'; G.hintShown = true; }, 5000);
-          }
-          // Show character name and notebook button
-          document.getElementById('char-name').style.opacity = '1';
-          document.getElementById('notebook-btn').style.opacity = '1';
-          document.getElementById('lang-btn').style.opacity = '1';
-          document.getElementById('crosshair').style.opacity = '1';
-        }, 1500);
-      }, 3000);
+          titleEl.style.opacity = '0';
+          subEl.style.opacity = '0';
+        }, 2500);
+        // Act 2
+        setTimeout(function() {
+          titleEl.textContent = L('game.title');
+          subEl.textContent = L('act2.subtitle');
+          titleEl.style.opacity = '1';
+          subEl.style.opacity = '1';
+        }, 3100);
+        setTimeout(function() {
+          titleEl.style.opacity = '0';
+          subEl.style.opacity = '0';
+        }, 5600);
+        setTimeout(showGameHud, 6200);
+      }
     }, 1500);
   }, 500);
 
@@ -329,6 +354,7 @@ function animate() {
     updateTombstoneChat();
     updateGravestones();
     updateNudge(dt);
+    if (typeof updateOnboarding === 'function') updateOnboarding(t, dt);
   }
 
   // Auto-save every 30 seconds

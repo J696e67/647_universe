@@ -355,7 +355,206 @@ The Tombstone sits on a circular pedestal (ring base). When the player approache
 
 ---
 
-## 12. Open Design Questions
+## 12. Onboarding Flow
+
+*Draft — subject to revision after first playtest round.*
+
+### 12.1 Rationale
+
+The foundational constraint in §2 is: no tutorials, no hints, no scores; learning emerges from interaction. This constraint has a floor. If a new player cannot form a basic "what can I do here?" hypothesis within the first sixty seconds, they will quit before any productive failure occurs. Kapur's Productive Failure framework requires engagement, and engagement requires a minimum control fluency.
+
+This section draws a principled line between three categories of scaffolding:
+
+- **Control scaffolding** — what buttons do what. *Permitted*, one-shot, diegetic where possible.
+- **Gameplay scaffolding** — what to do, what matters, where to go. *Forbidden*. The world teaches.
+- **Strategy scaffolding** — what the right answer is. *Forbidden in both onboarding and the main loop*.
+
+Onboarding uses environmental affordance (light, visible state changes, absence of geometry) as the primary signal. Text is minimal and appears only when an environmental cue cannot carry the load.
+
+### 12.2 Design Tenets
+
+1. **No gameplay instruction.** The onboarding never tells the player what to investigate, what to avoid, what the answer is, or where to go next.
+2. **No time pause.** The world continues evolving. Onboarding happens inside the live game, not in a frozen tutorial state.
+3. **Environment teaches.** A dark start scene with the house as the only bright source — walk toward the light is a reflex, not an instruction.
+4. **Affordances reveal gradually.** The maze entrance is not a tutorial obstacle; it is simply not visible until the player has demonstrated sensory exploration.
+5. **One strategic prompt, only.** *"外面有什么不一样的发生了" / "Something outside has changed."* is the single piece of textual guidance in the entire onboarding. It tells the player nothing about where to look or what to do — it only invites re-orientation.
+6. **Strong beat on first death.** The sequence first death → first CER submission → first validated claim is the moment the player realizes *death generates knowledge*. This is the core pedagogical beat of the whole game. It is permitted to break immersion once.
+
+### 12.3 Beat Sequence
+
+#### Beat 0 — Act 1 / Act 2 Title Cards (5 s total)
+
+- **Act 1**: 神农堂 / "死去才能知道为什么" (2.5 s)
+- **Act 2**: 647 宇宙 / "你对这个世界了解多少？" (2.5 s)
+
+Not skippable. At five seconds the cost of sitting through it is negligible, and the two-act framing establishes the emotional register before the simulation begins.
+
+#### Beat 1 — Night Scene, House as Sole Light
+
+Game starts at night (exact `TIME_OFFSET` tuned so the house's interior and door lamps are unambiguously the brightest features). The player's spawn position and yaw/pitch are unchanged from current values — the house falls naturally within the starting field of view.
+
+The maze entrance is **softlocked**:
+- The four corner pillars are unlit.
+- The black "opening" plane is hidden.
+- The `Press Space / Tap to enter` hint is suppressed even if the player stands on the entrance pad.
+- `transitionToMaze()` returns early while `G.onboardingComplete === false`.
+
+There is no visible cue that a maze exists. The player's only visible destination is the house.
+
+#### Beat 2 — Walk to the House
+
+No prompt appears for this. If the player remains idle within two metres of spawn for ten seconds, the existing control-tutorial string (`hint.desktop` / `hint.mobile`) is shown once and fades after five seconds. This is the control-tutorial exception permitted by Tenet 1 — it teaches button meanings only, not direction or purpose.
+
+#### Beat 3 — Sense-Menu Prompt (inside the house)
+
+Three seconds after the player enters the house interior (within 4 m of house centre), a single prompt fades in:
+
+- **EN**: *"Aim the crosshair at an object, then try the five sense buttons."*
+- **ZH**: *"准心对准物体，试试五个感官按钮。"*
+
+It dismisses when the player completes any sense action, and otherwise fades after twelve seconds. It does not re-appear.
+
+#### Beat 4 — Sensory Completion
+
+The player must perform each of the five senses — **Look, Listen, Touch, Taste, Smell** — at least once during the session. The counted target may differ per sense: Look the book, Taste the berry, Smell the berry, etc. The house contents (book, red berry, thermometer) contain no lethal interactions, so every path through this beat is safe.
+
+- Sense count is tracked once per sense-type, not per object. Repeated Looks do not advance progress.
+- The count persists through any number of house re-entries in the same session. It resets only on *New Game*.
+
+Each new sense completed raises the maze-entrance pillar intensity by 0.2 (0 → 0.2 → 0.4 → 0.6 → 0.8 → 1.0). This gives continuous environmental feedback — *the world is responding to what you do* — without any text.
+
+#### Beat 5 — Release
+
+When all five senses have been completed, in sequence:
+
+1. The four pillars reach full brightness (1.0).
+2. The black opening plane fades in over two seconds.
+3. The maze-entrance hint is re-enabled, appearing when the player approaches the entrance.
+4. Three seconds after Beat 5 activates, a single final prompt appears (fades after eight seconds):
+   - **EN**: *"Something outside has changed."*
+   - **ZH**: *"外面有什么不一样的发生了。"*
+5. `G.onboardingComplete` is set to true and written to localStorage.
+
+Onboarding is over. No further onboarding prompts appear in this session or any future session.
+
+#### Beat 6 — First Death + CER Reveal
+
+*Technically this beat is part of the live game, not onboarding. It is described here because it is the pedagogical culmination of the onboarding arc.*
+
+When the first character dies, the death plays normally (fade to black → *"[Name] collapsed."* → *"A new explorer arrives."*). Two seconds after the new explorer respawns:
+
+1. The Notebook icon in the HUD pulses gently.
+2. The Notebook overlay auto-opens on the **CER Board** tab.
+3. The scaffolded entry corresponding to the death's `causeId` appears, fully pre-populated (Claim, Evidence, Reasoning). For a KCN direct-ingestion death it is §8.1 Entry #1.
+4. The **Submit** button has a subtle highlight.
+5. The player may submit, edit, or close. The game continues in the background; closing the notebook does not reverse or penalise.
+
+If the player submits and the holistic grader returns `pass`:
+
+- The Leaderboard auto-opens *one time only*, strictly gated on the transition `validatedClaims.length === 1`.
+- A brief reveal animation marks the newly-validated claim.
+- Auto-closes after six seconds, returning the player to the game.
+
+This is the only time in the entire game that the Leaderboard opens automatically.
+
+### 12.4 Event-Triggered CER Entries
+
+The prior design seeded all three scaffolded CER entries in `initNotebook()`, which confronted first-time players with three unexplained rows on their first open. The revised design reveals each entry only when the corresponding in-world event has occurred:
+
+| Entry | Claim | Reveal trigger |
+|-------|-------|---------------|
+| #1 (complete demo) | 1 — White powder is lethal | First `kcn_ingestion` death |
+| #2 (Reasoning blank) | 3 — Berry is safe when uncontaminated | Any character eats berry clean-handed and survives |
+| #3 (Claim + Reasoning blank) | 6 — Cross-contamination | First `cross_contamination_death` |
+
+Before any trigger has fired, the CER tab shows only:
+
+- **EN**: *"No claims yet. Play, die, come back."*
+- **ZH**: *"还没有主张。去玩，去死，再回来。"*
+
+A revealed entry persists for the lifetime of that save.
+
+### 12.5 State Machine
+
+```
+G.onboarding = {
+  stage: 'act1' | 'act2' | 'walk' | 'house' | 'senses' | 'released' | 'done',
+  sensesCompleted: { look: false, listen: false, touch: false, taste: false, smell: false },
+  walkHintShown: false,
+  houseHintShown: false,
+  completeTimestamp: null
+}
+```
+
+`G.onboardingComplete` is derived from `stage === 'done'` and mirrored to localStorage key `647_onboarding_complete`. *New Game* clears this flag so the flow replays from the top.
+
+### 12.6 Edge Cases
+
+1. **Player leaves the house before completing five senses.** Maze remains softlocked. Player roams the outer world; `antistuck.js` Layer A nudges apply normally. Returning to the house resumes sense tracking.
+2. **Player completes five senses but does not approach the maze.** Pillars stay lit. World continues ambiently. No further prompts.
+3. **Player repeats one sense many times.** Only one instance per sense-type counts. Pillar brightness does not advance.
+4. **Player opens the Notebook before any death.** Empty CER tab, single gray caption shown. No scaffolded entries visible.
+5. **Player closes the auto-opened CER entry without submitting.** The entry remains under the CER tab; the player may submit later. Subsequent deaths of the same `causeId` do not re-trigger the auto-open — Beat 6 is one-shot.
+6. **Player submits and the holistic grader fails them.** Entry receives feedback. The Leaderboard does **not** auto-open. Player may edit and resubmit. Leaderboard auto-open is strictly gated on the first transition `validatedClaims.length === 1`.
+7. **Second session.** Save restores with `onboardingComplete === true`. No prompts, maze visible from start, game resumes in its normal running state.
+
+### 12.7 Lines Not to Cross
+
+The onboarding **may**:
+
+- Reveal what WASD and the crosshair do.
+- Reveal that the sense buttons exist and can be clicked.
+- Reveal, through environmental change, that the maze entrance exists.
+
+The onboarding **must not**:
+
+- Tell the player that the powder is dangerous.
+- Tell the player that death generates knowledge.
+- Tell the player to visit the maze.
+- Explain what the CER Board is for.
+- Reveal any of the fourteen Claims or their rubrics.
+- Suggest a hypothesis.
+
+The distinguishing principle is: *where to put your hands* is permissible; *what to think* is not.
+
+### 12.8 Tuning Parameters
+
+To calibrate in the first playtest round:
+
+- `TIME_OFFSET` at spawn — verify the house is unambiguously the brightest feature. Shift toward midnight if dusk is too bright.
+- Beat 3 (sense-menu prompt) delay — currently 3 s. Verify it arrives *after* the player has oriented themselves inside, not during entry.
+- Beat 2 idle-nudge threshold — currently 10 s. Verify it does not appear for players who are looking around without moving.
+- Pillar progressive-brightness steps — currently 0.2 each. Verify each step is legible from inside the house through a window, not only up close.
+- Beat 6 auto-open delay — currently 2 s after respawn. Verify the player has settled into the new character's view.
+- Leaderboard auto-close — currently 6 s. Verify long enough to read, short enough not to feel like a modal trap.
+
+### 12.9 Telemetry Hooks
+
+For IJSG evidence, the following ten timestamps are logged per session, forming the onboarding funnel:
+
+1. `onboarding_start` — first frame of Act 1.
+2. `first_movement` — first WASD or touch input.
+3. `house_entered` — first frame within house bounds.
+4. `sense_first_N` — first use of each of the five senses (5 events).
+5. `onboarding_complete` — fifth sense completed.
+6. `first_death` — `triggerDeath` fires for character 1.
+7. `cer_auto_opened` — Beat 6 auto-reveal occurs.
+8. `cer_first_submit` — first Submit click.
+9. `first_validation` — first claim marked validated.
+10. `leaderboard_auto_opened` — Leaderboard auto-open fires.
+
+Drop-off between any two consecutive events is the single most useful datum for the methodology section of an IJSG paper.
+
+### 12.10 Relationship to Existing Systems
+
+- `antistuck.js` Layer A (idle nudges) remains active throughout onboarding. No changes needed; the existing strings are compatible and non-redundant with the onboarding prompts.
+- `antistuck.js` Layer B (maze gate for repetitive deaths) is inactive during onboarding — the maze is softlocked, so repetitive death in the maze cannot occur. Activates normally post-onboarding.
+- The Tombstone is fully functional throughout onboarding. A player who wanders to it before completing five senses may engage dialogue as usual; the Tombstone has no onboarding-specific behaviour.
+- Save/load: `G.onboarding` is serialised as part of the save payload. The localStorage key `647_onboarding_complete` is separate, so a corrupted save does not force the player back through onboarding.
+
+---
+
+## 13. Open Design Questions
 
 1. **Player agency beyond observation**: How can players shape Universe 647 using acquired knowledge, not just observe it?
 2. **Multi-substance interaction complexity**: How many substances and interaction rules are needed for the inquiry space to feel rich without becoming intractable?

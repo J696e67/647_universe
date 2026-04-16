@@ -6,14 +6,8 @@ canvas { display: block; }
 
 /* Loading Screen */
 #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
   z-index: 100; transition: opacity 1.5s; }
-#loading-title { color: #fff; font-size: 3em; letter-spacing: 0.3em;
-  text-shadow: 0 0 40px rgba(255,255,255,0.3); }
-#loading-sub { color: rgba(255,255,255,0.5); font-size: 1.2em; margin-top: 8px;
-  font-family: sans-serif; letter-spacing: 0.15em; }
-#loading-tag { color: rgba(255,255,255,0.25); font-size: 0.8em; margin-top: 24px;
-  font-family: sans-serif; font-style: italic; }
+#loading-title, #loading-sub, #loading-tag { display: none; }
 
 /* Title */
 #title { position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -34,7 +28,7 @@ canvas { display: block; }
 
 /* Text Overlay */
 #text { position: fixed; bottom: 12%; left: 50%; transform: translateX(-50%); color: #fff;
-  font-size: 1.1em; text-shadow: 0 2px 10px rgba(0,0,0,0.9);
+  font-size: 0.77em; text-shadow: 0 2px 10px rgba(0,0,0,0.9);
   opacity: 0; transition: opacity 1s; pointer-events: none; z-index: 5;
   text-align: center; max-width: 85%; line-height: 2; }
 
@@ -68,6 +62,8 @@ canvas { display: block; }
   white-space: nowrap; transform: translate(-50%, -50%); }
 #action-menu button:hover { background: rgba(255,255,255,0.15); }
 #action-menu button:active { background: rgba(255,255,255,0.25); }
+#action-menu button .kbd { display: inline-block; margin-right: 5px; font-size: 0.8em;
+  color: rgba(255,255,255,0.45); min-width: 0.8em; text-align: center; }
 @media (pointer: coarse) {
   #action-menu button { padding: 10px 18px; font-size: 1em; }
   #text { bottom: 8%; }
@@ -200,6 +196,25 @@ canvas { display: block; }
   border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; color: #ddd; cursor: pointer;
   font-family: sans-serif; font-size: 0.9em; }
 .cer-editor-actions button.primary { background: rgba(200,180,120,0.2); border-color: rgba(200,180,120,0.5); color: #e0d4b8; }
+
+/* Onboarding Beat 6: pulse the newly-revealed CER submit button + notebook icon */
+@keyframes cer-submit-pulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(200,180,120,0); }
+  50% { box-shadow: 0 0 14px rgba(200,180,120,0.8); }
+}
+.cer-actions button.pulse-highlight {
+  background: rgba(200,180,120,0.25);
+  border-color: rgba(200,180,120,0.6);
+  color: #e0d4b8;
+  animation: cer-submit-pulse 1.5s ease-in-out infinite;
+}
+@keyframes notebook-icon-pulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(200,180,120,0)); }
+  50% { transform: scale(1.15); filter: drop-shadow(0 0 10px rgba(200,180,120,0.9)); }
+}
+#notebook-btn.pulse {
+  animation: notebook-icon-pulse 1.2s ease-in-out infinite;
+}
 
 /* Anti-stuck: Nudge text (Layer A) */
 #nudge-text { position: fixed; bottom: 8%; left: 50%; transform: translateX(-50%);

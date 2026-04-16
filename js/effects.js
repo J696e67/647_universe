@@ -88,6 +88,12 @@ function triggerDeath(message, causeId) {
     G.notebook.crossContaminationDeathSeen = true;
   }
 
+  // Event-triggered CER seed reveal (GDD §12.4)
+  if (typeof revealScaffoldedCerEntry === 'function' && typeof scaffoldedClaimForCause === 'function') {
+    var sc = scaffoldedClaimForCause(causeId);
+    if (sc) revealScaffoldedCerEntry(sc);
+  }
+
   // Place gravestone on PBC boundary ring
   createDeathGravestone(deathRecord);
 
@@ -111,10 +117,15 @@ function triggerDeath(message, causeId) {
     deathNew.style.opacity = '1';
   }, 3000);
 
+  var isFirstDeath = G.notebook.deaths.length === 1;
   setTimeout(function() {
     deathScreen.classList.remove('active');
     deathMsg.style.opacity = '0';
     deathNew.style.opacity = '0';
     respawnCharacter();
+    // Beat 6 (GDD §12.3): auto-open CER 2s after first respawn
+    if (isFirstDeath && typeof maybeTriggerBeat6 === 'function') {
+      maybeTriggerBeat6(causeId);
+    }
   }, 6000);
 }

@@ -20,6 +20,31 @@ var vm = require('vm');
 var CER_SRC = fs.readFileSync(path.join(__dirname, '..', 'js', 'cer.js'), 'utf8');
 
 var fetchMock = null;  // per-test override
+
+// Minimal document stub — cer.js touches DOM during Beat 6 + leaderboard
+// auto-open. Each getElementById returns a fake element that records
+// classList changes so tests can assert on them.
+var fakeDom = {};
+function fakeEl(id) {
+  if (fakeDom[id]) return fakeDom[id];
+  var el = {
+    id: id,
+    classList: {
+      _set: {},
+      add: function(c) { this._set[c] = true; },
+      remove: function(c) { delete this._set[c]; },
+      contains: function(c) { return !!this._set[c]; }
+    },
+    querySelectorAll: function() { return []; }
+  };
+  fakeDom[id] = el;
+  return el;
+}
+var fakeDocument = {
+  getElementById: fakeEl,
+  querySelectorAll: function() { return []; },
+  querySelector: function() { return null; }
+};
 var sandbox = {
   console: console,
   IS_LOCAL: false,
@@ -27,6 +52,9 @@ var sandbox = {
   saveGame: function() {},
   showDiscoveryNotification: function() {},
   renderNotebook: function() {},
+  showLeaderboard: function() { fakeEl('leaderboard-overlay').classList.add('active'); },
+  document: fakeDocument,
+  NOTEBOOK_MODE: 'log',
   fetch: function(url, opts) { return fetchMock(url, opts); },
   L: function(key, params) {
     if (!params) return key;
@@ -372,6 +400,73 @@ function runTombHistory() {
 }
 
 // =================================================================
+// Scenario 11 — Beat 6 + first-validation Leaderboard auto-open
+// =================================================================
+// Verifies GDD §12.3 Beat 6 and §12.8 first-validation celebration
+// semantics: both are strictly one-shot, gated on save-level flags.
+function runBeat6(done) {
+  section('11. Beat 6 + first-validation');
+  G.notebook = freshNotebook();
+
+  // Clear fake DOM state between tests
+  fakeEl('leaderboard-overlay').classList._set = {};
+  fakeEl('notebook-overlay').classList._set = {};
+  fakeEl('notebook-btn').classList._set = {};
+
+  // Event-triggered reveal fires on death
+  sandbox.revealScaffoldedCerEntry(sandbox.scaffoldedClaimForCause('kcn_ingestion'));
+  ok(G.notebook.cerEntries.length === 1, 'KCN death reveals claim 1 entry');
+  ok(G.notebook.cerEntries[0].claimId === 1, 'Revealed entry is claim 1');
+
+  // maybeTriggerBeat6 should not re-fire
+  var maybeTriggerBeat6 = sandbox.maybeTriggerBeat6;
+  maybeTriggerBeat6('kcn_ingestion');
+  ok(G.notebook._beat6Fired === true, 'Beat 6 flag set on first call');
+  var entriesAfter = G.notebook.cerEntries.length;
+  maybeTriggerBeat6('kcn_ingestion');
+  ok(G.notebook.cerEntries.length === entriesAfter, 'Beat 6 second call is no-op');
+
+  // First-validation auto-open: 0→1 transition opens leaderboard after 1.5s
+  sandbox.IS_LOCAL = false;
+  G.notebook.deaths.push({ causeId: 'kcn_ingestion' });
+  var entry = {
+    claim: 'The white powder is lethal when any explorer ingests it.',
+    evidence: 'Alice tasted it and collapsed immediately after.',
+    reasoning: 'Tasting the powder was her last action; the death is causally linked to that ingestion.',
+    validated: false
+  };
+  G.notebook.cerEntries.push(entry);
+  sandbox.submitCerEntry(entry);
+
+  // Wait for the 1.5s delayed leaderboard auto-open + 6s auto-close
+  setTimeout(function() {
+    ok(entry.validated === true, 'Entry validated via offline grader');
+    ok(G.notebook._firstValidationCelebrated === true, 'firstValidationCelebrated flag set');
+    ok(fakeEl('leaderboard-overlay').classList.contains('active'), 'Leaderboard auto-opened on first validation');
+
+    // Submit a second claim (different id) — must NOT re-open leaderboard
+    fakeEl('leaderboard-overlay').classList._set = {};
+    G.notebook.pbcCrossed = true;
+    var entry2 = {
+      claimId: 10,
+      claim: 'The world loops back on itself',
+      evidence: 'I walked west and ended up east.',
+      reasoning: 'Crossing the boundary repeats the starting area, indicating a periodic topology.',
+      validated: false
+    };
+    G.notebook.cerEntries.push(entry2);
+    sandbox.submitCerEntry(entry2);
+
+    setTimeout(function() {
+      ok(entry2.validated === true, 'Second entry validated');
+      ok(G.notebook.validatedClaims.length === 2, 'Two claims validated');
+      ok(!fakeEl('leaderboard-overlay').classList.contains('active'), 'Leaderboard does NOT auto-open for subsequent validations');
+      done();
+    }, 1800);
+  }, 1800);
+}
+
+// =================================================================
 // Scenario 10 — EQUIP tag parsing + equipment grant
 // =================================================================
 // Mirrors tombstone.js:processEquipment regex + equipment.js:grantEquipment.
@@ -431,15 +526,17 @@ function runEquipTag() {
   // Async scenarios last
   runCerGraderPass(function() {
     runCerGraderFail(function() {
-      process.stdout.write('\n\n');
-      if (TEST.fail === 0) {
-        console.log('\x1b[32m✓ ALL PASS\x1b[0m — ' + TEST.pass + ' assertions across 10 scenarios');
-        process.exit(0);
-      } else {
-        console.log('\x1b[31m✗ ' + TEST.fail + ' FAIL\x1b[0m / ' + (TEST.pass + TEST.fail) + ' total');
-        for (var i = 0; i < TEST.fails.length; i++) console.log('  ✗ ' + TEST.fails[i]);
-        process.exit(1);
-      }
+      runBeat6(function() {
+        process.stdout.write('\n\n');
+        if (TEST.fail === 0) {
+          console.log('\x1b[32m✓ ALL PASS\x1b[0m — ' + TEST.pass + ' assertions across 11 scenarios');
+          process.exit(0);
+        } else {
+          console.log('\x1b[31m✗ ' + TEST.fail + ' FAIL\x1b[0m / ' + (TEST.pass + TEST.fail) + ' total');
+          for (var i = 0; i < TEST.fails.length; i++) console.log('  ✗ ' + TEST.fails[i]);
+          process.exit(1);
+        }
+      });
     });
   });
 })();

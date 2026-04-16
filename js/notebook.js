@@ -22,7 +22,9 @@ function initNotebook() {
     berryCleanEatenSurvived: false,
     crossContaminationDeathSeen: false
   };
-  if (typeof seedScaffoldedCerEntries === 'function') seedScaffoldedCerEntries();
+  // Scaffolded CER entries are no longer seeded up-front. Each entry is
+  // revealed only when its triggering in-world event fires — see
+  // js/cer.js revealScaffoldedCerEntry() and GDD §12.4.
 }
 
 function addNotebookEntry(action, target, location, result) {
@@ -230,4 +232,6 @@ function loadGame() {
 
 function clearSave() {
   localStorage.removeItem('647_save');
+  localStorage.removeItem('647_onboarding_complete');
+  localStorage.removeItem('shennong_discoveries');
 }

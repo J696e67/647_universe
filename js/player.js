@@ -16,12 +16,27 @@ function setupControls() {
       e.preventDefault();
       if (G.inMaze && G.mazeExitReady && Math.sqrt((G.mpx-2)*(G.mpx-2)+(G.mpz-2)*(G.mpz-2)) < 3) {
         transitionToOutdoor();
-      } else if (!G.inMaze && pDist(G.px, G.pz, 0, 0) < 2.5) {
+      } else if (!G.inMaze && pDist(G.px, G.pz, 0, 0) < 2.5 && !G._mazeEntranceLocked) {
         transitionToMaze();
       }
     }
     if (e.code === 'KeyN') {
       toggleNotebook();
+    }
+    // Sense action hotkeys 1-5: when the radial action menu is visible,
+    // trigger the nth button. Lets desktop players act without breaking
+    // pointer lock. Ignored while typing in the tombstone chat.
+    if (/^Digit[1-9]$/.test(e.code)) {
+      var ci = document.getElementById('chat-in');
+      if (document.activeElement === ci) return;
+      var menu = document.getElementById('action-menu');
+      if (!menu || !menu.classList.contains('active')) return;
+      var idx = parseInt(e.code.slice(5), 10) - 1;
+      var btns = menu.querySelectorAll('button');
+      if (idx >= 0 && idx < btns.length) {
+        e.preventDefault();
+        btns[idx].click();
+      }
     }
     if (e.code === 'KeyR') {
       if (G.inMaze) {
@@ -40,20 +55,40 @@ function setupControls() {
   });
   document.addEventListener('keyup', function(e) { G.keys[e.code] = false; });
 
-  // Pointer lock (desktop)
+  // Pointer lock (desktop). When the player clicks canvas while in
+  // sense-inspection mode (menu open, cursor visible), reset the menu
+  // and re-lock. Button clicks do not reach this handler because the
+  // menu buttons are outside the canvas DOM subtree.
   G.ren.domElement.addEventListener('click', function() {
     if (!('ontouchstart' in window) && !G.pointerLocked) {
+      if (G._senseInspecting) {
+        G._senseInspecting = false;
+        G._senseDecel = null;
+        if (typeof resetSenseInspection === 'function') resetSenseInspection();
+      }
       G.ren.domElement.requestPointerLock();
     }
   });
   document.addEventListener('pointerlockchange', function() {
     G.pointerLocked = (document.pointerLockElement === G.ren.domElement);
     document.getElementById('crosshair').style.opacity = G.pointerLocked ? '1' : '0';
+    // Restore saved camera angle on unlock (prevents the spurious-delta jump)
+    if (!G.pointerLocked && G._savedYawPitch) {
+      G.yaw = G._savedYawPitch.yaw;
+      G.pitch = G._savedYawPitch.pitch;
+      G._savedYawPitch = null;
+    }
   });
   document.addEventListener('mousemove', function(e) {
     if (G.pointerLocked) {
-      G.yaw -= e.movementX * 0.002;
-      G.pitch -= e.movementY * 0.002;
+      var sens = 0.002;
+      // Smooth deceleration when a sense menu is appearing (250ms ease-out)
+      if (G._senseDecel) {
+        var t = Math.min((performance.now() - G._senseDecel.start) / G._senseDecel.duration, 1);
+        sens *= (1 - t) * (1 - t);  // quadratic ease-out
+      }
+      G.yaw -= e.movementX * sens;
+      G.pitch -= e.movementY * sens;
       G.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, G.pitch));
     }
   });
@@ -232,8 +267,8 @@ function updatePlayer(dt) {
     }
   }
 
-  // Maze entrance hint
-  if (pDist(G.px, G.pz, 0, 0) < 2.5) {
+  // Maze entrance hint (suppressed while entrance is softlocked by onboarding)
+  if (pDist(G.px, G.pz, 0, 0) < 2.5 && !G._mazeEntranceLocked) {
     G.mazeHintEl.textContent = 'ontouchstart' in window ? L('hint.maze_enter.mobile') : L('hint.maze_enter.desktop');
     G.mazeHintEl.style.opacity = '1';
   } else {
@@ -302,8 +337,9 @@ function updatePlayerMaze(dt) {
 
 // ===================== BASIC INTERACTIONS =====================
 function tryInteract() {
-  // Maze entrance (outdoor)
+  // Maze entrance (outdoor) — blocked while softlocked by onboarding
   if (!G.inMaze && pDist(G.px, G.pz, 0, 0) < 2.5) {
+    if (G._mazeEntranceLocked) return;
     transitionToMaze(); return;
   }
   // Maze exit
@@ -323,6 +359,7 @@ function tryInteract() {
 // ===================== MAZE TRANSITIONS =====================
 function transitionToMaze() {
   if (G.inMaze) return;
+  if (G._mazeEntranceLocked) return;  // onboarding softlock
   if (G.mazeGateActive) return;
   // Layer B: check for repetitive death gate (only once per new death)
   var deathCount = G.notebook.deaths.length;

@@ -569,25 +569,45 @@ function createEntrance() {
   var stoneMat = new THREE.MeshLambertMaterial({ color: 0x707070 });
   var pillarGeo = new THREE.CylinderGeometry(0.12, 0.18, 2, 6);
   var corners = [[-1.3,-1.3],[1.3,-1.3],[-1.3,1.3],[1.3,1.3]];
-  var glowMat = new THREE.MeshStandardMaterial({
+  G.mazePillarMat = new THREE.MeshStandardMaterial({
     color: 0x88aacc, emissive: 0x4488aa, emissiveIntensity: 0.6,
     roughness: 0.4, metalness: 0.2
   });
+  G.mazePillars = [];
+  G.mazePillarLights = [];
   for (var i = 0; i < 4; i++) {
-    var p = new THREE.Mesh(pillarGeo, glowMat);
+    var p = new THREE.Mesh(pillarGeo, G.mazePillarMat);
     p.position.set(corners[i][0], ey+1, corners[i][1]);
     G.scene.add(p);
+    G.mazePillars.push(p);
     var pLight = new THREE.PointLight(0x88aacc, 0.4, 6);
     pLight.position.set(corners[i][0], ey+2.1, corners[i][1]);
     G.scene.add(pLight);
+    G.mazePillarLights.push(pLight);
   }
   var plat = new THREE.Mesh(new THREE.BoxGeometry(3, 0.15, 3), stoneMat);
   plat.position.set(0, ey-0.08, 0); G.scene.add(plat);
-  var opening = new THREE.Mesh(
+  G.mazeOpening = new THREE.Mesh(
     new THREE.PlaneGeometry(2.2, 2.2).rotateX(-Math.PI/2),
     new THREE.MeshBasicMaterial({ color: 0x0a0a0a })
   );
-  opening.position.set(0, ey+0.01, 0); G.scene.add(opening);
-  var eLight = new THREE.PointLight(0xCCAA66, 0.4, 8);
-  eLight.position.set(0, ey-0.5, 0); G.scene.add(eLight);
+  G.mazeOpening.position.set(0, ey+0.01, 0); G.scene.add(G.mazeOpening);
+  G.mazeEntranceLight = new THREE.PointLight(0xCCAA66, 0.4, 8);
+  G.mazeEntranceLight.position.set(0, ey-0.5, 0); G.scene.add(G.mazeEntranceLight);
+  G._mazeEntranceLocked = false;
+}
+
+// Set entrance visibility (0..1). 0 = fully hidden / softlocked.
+// Used by js/onboarding.js to gradually reveal the maze as the player
+// completes the five senses.
+function setMazeEntranceVisible(frac) {
+  if (!G.mazePillarMat) return;
+  frac = Math.max(0, Math.min(1, frac));
+  G.mazePillarMat.emissiveIntensity = 0.6 * frac;
+  for (var i = 0; i < G.mazePillarLights.length; i++) {
+    G.mazePillarLights[i].intensity = 0.4 * frac;
+  }
+  if (G.mazeOpening) G.mazeOpening.visible = frac >= 0.99;
+  if (G.mazeEntranceLight) G.mazeEntranceLight.intensity = 0.4 * frac;
+  G._mazeEntranceLocked = frac < 0.99;
 }

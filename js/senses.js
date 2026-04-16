@@ -5,6 +5,10 @@ var senseRaycaster = new THREE.Raycaster();
 senseRaycaster.far = 5.0;
 var currentTarget = null;
 var actionMenuVisible = false;
+// When the player leaves inspection mode while still aiming at the same
+// object, suppress reopening the menu until their aim moves elsewhere.
+// Prevents a pointer-lock / menu flicker loop.
+var _inspectionCooldownTarget = null;
 
 function getSenseProperty(obj, key) {
   if (obj.userData.senseOverrides && obj.userData.senseOverrides[key])
@@ -25,6 +29,8 @@ function updateSenses() {
   if (intersects.length > 0) {
     var hit = intersects[0].object;
     if (hit.userData.interactable) {
+      // Suppress reopening if this is the object the player just stopped inspecting
+      if (_inspectionCooldownTarget === hit) return;
       if (currentTarget !== hit) {
         currentTarget = hit;
         showActionMenu(hit);
@@ -32,11 +38,21 @@ function updateSenses() {
       return;
     }
   }
-  // No target
+  // Aim left the target — clear both the current target and any cooldown
   if (currentTarget) {
     currentTarget = null;
     hideActionMenu();
   }
+  _inspectionCooldownTarget = null;
+}
+
+// Called by player.js when the user clicks off the menu (non-button)
+// to re-engage the camera. Marks the current target as "cooled down"
+// so it won't instantly re-open while the aim is still on it.
+function resetSenseInspection() {
+  _inspectionCooldownTarget = currentTarget;
+  currentTarget = null;
+  hideActionMenu();
 }
 
 function showActionMenu(obj) {
@@ -44,12 +60,18 @@ function showActionMenu(obj) {
   menu.innerHTML = '';
   var actions = getAvailableActions(obj);
   var n = actions.length;
-  var radius = ('ontouchstart' in window) ? 90 : 80;
+  var isMobile = 'ontouchstart' in window;
+  var radius = isMobile ? 90 : 80;
   // Start from top (-90°), distribute evenly
   var startAngle = -Math.PI / 2;
   for (var i = 0; i < n; i++) {
     var btn = document.createElement('button');
-    btn.textContent = actions[i].label;
+    if (isMobile) {
+      btn.textContent = actions[i].label;
+    } else {
+      // Desktop: prepend a subtle number hint for keyboard 1-5 hotkey
+      btn.innerHTML = '<span class="kbd">' + (i + 1) + '</span>' + actions[i].label;
+    }
     btn.dataset.action = actions[i].action;
     btn.addEventListener('click', (function(action, target) {
       return function(e) {
@@ -64,6 +86,28 @@ function showActionMenu(obj) {
   }
   menu.classList.add('active');
   actionMenuVisible = true;
+
+  // Desktop: smoothly decelerate camera over 250ms, then release
+  // pointer lock so the cursor can click buttons. Avoids the jarring
+  // instant-stop when the menu appears.
+  if (G.pointerLocked && !('ontouchstart' in window) && !G._senseDecel) {
+    // Save the exact camera angle so we can restore it after pointer
+    // lock exits — browsers fire a spurious mousemove with a large
+    // delta on unlock that would otherwise jerk the camera.
+    G._savedYawPitch = { yaw: G.yaw, pitch: G.pitch };
+    G._senseDecel = { start: performance.now(), duration: 250 };
+    setTimeout(function() {
+      G._senseDecel = null;
+      if (actionMenuVisible) {
+        G._senseInspecting = true;
+        // Restore angle right before unlock (belt)
+        if (G._savedYawPitch) { G.yaw = G._savedYawPitch.yaw; G.pitch = G._savedYawPitch.pitch; }
+        try { document.exitPointerLock(); } catch(e) {}
+      } else {
+        G._savedYawPitch = null;
+      }
+    }, 250);
+  }
 }
 
 function hideActionMenu() {
@@ -110,6 +154,9 @@ function performAction(action, obj) {
   else if (action === 'touch') doTouch(obj, char, name, room);
   else if (action === 'taste') doTaste(obj, char, name, room);
   else if (action === 'smell') doSmell(obj, char, name, room);
+
+  // Onboarding (GDD §12.3 Beat 4): count each sense once
+  if (typeof onboardingSenseUsed === 'function') onboardingSenseUsed(action);
 }
 
 function doLook(obj, char, name, room) {
@@ -281,7 +328,11 @@ function doTaste(obj, char, name, room) {
       if (obj.userData.isBerry && !tasteProp.lethal &&
           char.handContamination.length === 0 &&
           (!obj.userData.contamination || obj.userData.contamination.length === 0)) {
+        var was = G.notebook.berryCleanEatenSurvived;
         G.notebook.berryCleanEatenSurvived = true;
+        if (!was && typeof revealScaffoldedCerEntry === 'function') {
+          revealScaffoldedCerEntry(3);
+        }
       }
 
       // DECAYED berry → disintegrates, leave seed
