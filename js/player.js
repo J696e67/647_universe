@@ -243,7 +243,10 @@ function updatePlayer(dt) {
   if (G.px < -G.HW) { G.px += G.W; wrapped = true; }
   if (G.pz > G.HW) { G.pz -= G.W; wrapped = true; }
   if (G.pz < -G.HW) { G.pz += G.W; wrapped = true; }
-  if (wrapped && G.notebook) G.notebook.pbcCrossed = true;
+  if (wrapped && G.notebook) {
+    G.notebook.pbcCrossed = true;
+    if (typeof checkAndEnqueueGates === 'function') checkAndEnqueueGates();
+  }
 
   // Camera
   var gy = groundH(G.px, G.pz);
@@ -264,6 +267,7 @@ function updatePlayer(dt) {
         pitch: G.pitch,
         isNight: !!G._skyIsNight
       });
+      if (typeof checkAndEnqueueGates === 'function') checkAndEnqueueGates();
     }
   }
 
@@ -313,7 +317,10 @@ function updatePlayerMaze(dt) {
   if (G.mpx < -G.MHALF) { G.mpx += G.MSIZE; mwrapped = true; }
   if (G.mpz > G.MHALF) { G.mpz -= G.MSIZE; mwrapped = true; }
   if (G.mpz < -G.MHALF) { G.mpz += G.MSIZE; mwrapped = true; }
-  if (mwrapped && G.notebook) G.notebook.pbcCrossed = true;
+  if (mwrapped && G.notebook) {
+    G.notebook.pbcCrossed = true;
+    if (typeof checkAndEnqueueGates === 'function') checkAndEnqueueGates();
+  }
 
   if (!G.mazeExitReady && Math.sqrt((G.mpx-2)*(G.mpx-2)+(G.mpz-2)*(G.mpz-2)) > 8) G.mazeExitReady = true;
 

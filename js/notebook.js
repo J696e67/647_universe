@@ -195,7 +195,8 @@ function saveGame() {
       alive: G.alive,
       mazeGateShownForDeathCount: G.mazeGateShownForDeathCount || 0,
       tombChatInited: G.tombChatInited,
-      tombGreetingShown: G.tombGreetingShown
+      tombGreetingShown: G.tombGreetingShown,
+      onboarding: G.onboarding
     }));
   } catch(e) {}
 }
@@ -210,6 +211,11 @@ function loadGame() {
     if (typeof data.characterIndex === 'number') G.characterIndex = data.characterIndex;
     if (data.discoveredIds)  G.discoveredIds  = data.discoveredIds;
 
+    // Migrate older saves: ensure all fields the current code reads exist.
+    // Without this, players loading a save from before a schema change see
+    // crashes (indexOf on undefined) or broken evidence gates.
+    migrateNotebookSchema();
+
     // v2 fields
     if (data.version >= 2) {
       if (typeof data.px === 'number') { G.px = data.px; G.pz = data.pz; }
@@ -219,6 +225,8 @@ function loadGame() {
       if (typeof data.mazeGateShownForDeathCount === 'number') G.mazeGateShownForDeathCount = data.mazeGateShownForDeathCount;
       if (typeof data.tombChatInited === 'boolean') G.tombChatInited = data.tombChatInited;
       if (typeof data.tombGreetingShown === 'boolean') G.tombGreetingShown = data.tombGreetingShown;
+      // Onboarding state — pending restore until initOnboarding() runs
+      if (data.onboarding) G._pendingOnboarding = data.onboarding;
 
       // Restore character hand contamination
       G._pendingHandContamination = data.handContamination || [];
@@ -234,4 +242,28 @@ function clearSave() {
   localStorage.removeItem('647_save');
   localStorage.removeItem('647_onboarding_complete');
   localStorage.removeItem('shennong_discoveries');
+}
+
+// Backfill any field the current G.notebook schema expects but an older
+// save may not have. Called from loadGame() after restoring data.notebook.
+function migrateNotebookSchema() {
+  var n = G.notebook;
+  if (!n) return;
+  if (!Array.isArray(n.entries))            n.entries = [];
+  if (!Array.isArray(n.deaths))             n.deaths = [];
+  if (!Array.isArray(n.discoveries))        n.discoveries = [];
+  if (!Array.isArray(n.tombstoneDialogue))  n.tombstoneDialogue = [];
+  if (!Array.isArray(n.cerEntries))         n.cerEntries = [];
+  if (!Array.isArray(n.validatedClaims))    n.validatedClaims = [];
+  if (!Array.isArray(n.skyObservations))    n.skyObservations = [];
+  if (!Array.isArray(n.thermometerLocations)) n.thermometerLocations = [];
+  if (typeof n.observedBerryStages !== 'object' || !n.observedBerryStages) n.observedBerryStages = {};
+  if (typeof n.dayNightCycles !== 'number') n.dayNightCycles = 0;
+  if (typeof n.lastCycleMark !== 'number')  n.lastCycleMark = 0;
+  if (typeof n.totalCharacters !== 'number') n.totalCharacters = 0;
+  if (typeof n.pbcCrossed !== 'boolean')    n.pbcCrossed = false;
+  if (typeof n.berryCleanEatenSurvived !== 'boolean') n.berryCleanEatenSurvived = false;
+  if (typeof n.crossContaminationDeathSeen !== 'boolean') n.crossContaminationDeathSeen = false;
+  if (typeof n._beat6Fired !== 'boolean')   n._beat6Fired = false;
+  if (typeof n._firstValidationCelebrated !== 'boolean') n._firstValidationCelebrated = false;
 }

@@ -92,7 +92,18 @@ var tombConversationHistory = [];
 function initTombstoneChat() {
   G.tombChatInited = false;
   G.tombGreetingShown = false;
+  G._tombInVisit = false;
   tombConversationHistory = [];
+}
+
+// Called by characters.js spawnCharacter() — fresh character = fresh dialogue
+function resetTombstoneConversation() {
+  tombConversationHistory = [];
+  G.tombChatInited = false;
+  G.tombGreetingShown = false;
+  G._tombInVisit = false;
+  var msgsEl = document.getElementById('chat-msgs');
+  if (msgsEl) msgsEl.innerHTML = '';
 }
 
 function updateTombstoneChat() {
@@ -101,6 +112,11 @@ function updateTombstoneChat() {
   var chatEl = document.getElementById('chat');
 
   if (dist < 5) {
+    // Entering visit range — fresh visit = fresh history (GDD §7.4)
+    if (!G._tombInVisit) {
+      G._tombInVisit = true;
+      tombConversationHistory = [];
+    }
     chatEl.classList.add('active');
     if (!G.tombChatInited) {
       G.tombChatInited = true;
@@ -113,6 +129,14 @@ function updateTombstoneChat() {
       }, 2000);
     }
   } else {
+    // Exit visit range — mark for next-entry reset, clear UI
+    if (G._tombInVisit) {
+      G._tombInVisit = false;
+      G.tombChatInited = false;
+      G.tombGreetingShown = false;
+      var msgsEl = document.getElementById('chat-msgs');
+      if (msgsEl) msgsEl.innerHTML = '';
+    }
     chatEl.classList.remove('active');
     var ci = document.getElementById('chat-in');
     if (document.activeElement === ci) ci.blur();
@@ -150,10 +174,8 @@ function sendTombstoneMsg(msg) {
   if (IS_LOCAL && typeof LOCAL_CONFIG !== 'undefined' && LOCAL_CONFIG.ANTHROPIC_API_KEY &&
       LOCAL_CONFIG.ANTHROPIC_API_KEY.indexOf('sk-ant-') === 0 &&
       LOCAL_CONFIG.ANTHROPIC_API_KEY.length > 20) {
-    console.log('[Tombstone] → Claude Sonnet');
     sendToClaudeSonnet(msg, aDiv, msgsEl);
   } else {
-    console.log('[Tombstone] → offline fallback');
     sendToOllama(msg, aDiv, msgsEl);
   }
 }

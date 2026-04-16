@@ -280,43 +280,70 @@ The Notebook has two modes: free-form pages for personal observations, and CER B
 
 The CER (Claim–Evidence–Reasoning) Board is the game's articulation mechanism. It is where observation becomes knowledge. The board is integrated into the Notebook — not a separate UI panel — so it feels like part of the player's research journal, not a classroom worksheet.
 
-**Scaffolded Onboarding: Three Pre-Populated Entries**
+#### Foundational Principles
 
-The game begins with three CER entries at decreasing levels of completeness. This teaches the CER format through use, not instruction.
+**(1) Evidence must be real.** Every Evidence field on every CER entry — including the demo entry — must be **extracted from this player's actual gameplay history** (Death Records, Notebook entries, sensory observation log). The game **never** fabricates evidence using placeholder names or events the player has not personally observed. The game's job is to *format* what the player has observed into the CER structure; the player's job is to *interpret* that evidence into a claim and reason about it.
 
-**Entry #1 — Fully completed (demonstration)**
+**(2) One demo, then on your own.** The game shows ONE fully-populated CER entry across the entire save — the very first entry ever loaded. All subsequent entries are *evidence-only* — the player writes their own Claim and Reasoning. The single demo teaches the form of CER; productive failure does the rest.
 
-| | Content |
-|---|---------|
-| Claim | White powder is lethal |
-| Evidence | Alice tasted white powder and collapsed (Death Record #1) |
-| Reasoning | Tasting the powder was Alice's last action before death. The powder had a distinct bitter almond scent, consistent with known toxic substances. The causal link is: ingestion of the powder triggered a lethal reaction. |
+**(3) Demo Reasoning is intentionally incomplete.** The reasoning shown in the demo entry is deliberately not bulletproof. Later observations may force the player to revise it (e.g., the demo for "Red berry is safe" omits the *clean hands* precondition; once cross-contamination is discovered, the player must return and amend). This trap is preserved regardless of which claim becomes the demo.
 
-**Entry #2 — Claim + Evidence provided, Reasoning blank**
+#### Entry Lifecycle
 
-| | Content |
-|---|---------|
-| Claim | Red berry is safe to eat |
-| Evidence | Tylor ate the red berry with clean hands and survived (Death Record #2) |
-| Reasoning | [Player fills in] |
+1. **Silent enqueue.** Whenever any of the 14 evidence gates is satisfied (whether through a death event or a non-fatal observation), a new entry is silently added to the CER Board. The board does NOT auto-open at this moment. The player may open the Notebook manually at any time to see and engage with pending entries.
+2. **Death triggers auto-open.** Every player death — between the death screen and the new character's spawn — auto-opens the CER Board (see §12.3 Beat 6). The player engages or closes; only after closing does the new character spawn.
+3. **First-ever entry is the demo.** Across the lifetime of a save, the very first entry ever enqueued receives full populate (Claim + Evidence + Reasoning). All subsequent entries receive only Evidence; Claim and Reasoning are blank.
+4. **Tie-break for "first-ever".** If multiple gates are satisfied at the same death event (e.g., the player gathered evidence for claim 3 silently before dying from KCN), they are ordered by **the timestamp at which each gate became satisfied** — the gate satisfied earliest wins demo status. Simultaneous satisfactions tiebreak by ascending claim ID.
 
-This entry is a deliberate trap. Later, when cross-contamination (#6) is discovered, the player must return and revise this entry — the berry is safe only when uncontaminated. This revision experience teaches that scientific claims have boundary conditions.
+#### Per-Entry Field Composition
 
-**Entry #3 — Only Evidence provided, Claim and Reasoning blank**
+Every claim has four associated assets:
 
-| | Content |
-|---|---------|
-| Claim | [Player fills in] |
-| Evidence | Tylor ate the red berry and survived. Bob touched white powder, then ate the red berry, and collapsed. |
-| Reasoning | [Player fills in] |
+| Asset | Visibility | Use |
+|-------|------------|-----|
+| **Claim title** (one-line) | Visible only on the demo entry | Pre-fills the Claim field |
+| **Evidence extraction recipe** | Always invisible | Reads `G.notebook.deaths` / `G.notebook.entries` and produces a real-data sentence |
+| **Reasoning demo template** | Visible only on the demo entry | Pre-fills the Reasoning field. Intentionally incomplete |
+| **Reasoning grading rubric** | Always invisible | Used by the holistic Claude grader (§8.2) to evaluate any submitted entry's reasoning |
 
-This is the critical entry. The evidence is contradictory on its surface. The player must generate their own claim (cross-contamination) and their own reasoning. This is the full arc of scientific reasoning: from puzzling data to explanatory claim.
+The 14 reasoning demo templates and grading rubrics are listed in §8.3.
 
-**Transition to Free Inquiry**
+#### Player-Authored Claim Matching
 
-After the three scaffolded entries, the CER Board opens for player-authored entries. The transition is triggered when the player articulates a claim to the Tombstone that is not already on the board. The Tombstone responds: "That's not in any record I've seen. Do you want to write it down?"
+When a player writes their own Claim text (entries beyond the demo), the system must determine which of the 14 canonical claims they are addressing. This is a **semantic matching** task — different phrasings expressing the same scientific claim are accepted. The Claude grader performs this matching holistically, not via keyword pattern matching. (For implementation efficiency, a lexical first-pass may shortlist candidates, but the final decision is the LLM's.)
 
-### 8.2 Free-Form Notebook Pages
+#### Insufficient-Data Fallback
+
+If the system cannot fill an entry's Evidence with real data (e.g., a cross-contamination death has occurred but no clean-handed berry survival exists yet to compose the contrast), the entry is enqueued with only the available evidence. The missing portion shows a transparent placeholder — for example: *"[no clean-berry survival record yet — keep playing to gather this evidence]"* — rather than fabricated text. The player may submit once they have completed the missing portion through gameplay.
+
+#### Transition to Free Inquiry
+
+After the demo and any number of evidence-only entries, the player may also create their own CER entries from scratch via a *+ New Claim* button. The Tombstone may invite this when a player articulates a claim in dialogue that is not already on the board: *"That's not in any record I've seen. Do you want to write it down?"*
+
+### 8.3 Reasoning Demo Templates (per claim)
+
+Each of the 14 claims has a *demo reasoning template* and a *grading rubric*. The demo template is shown verbatim only in the first-ever entry of a save (the demo entry); it is intentionally incomplete to invite later revision. The rubric is invisible to the player and used by the holistic grader.
+
+| # | Claim | Demo Reasoning (intentionally incomplete) | What it omits / invites revising |
+|---|-------|------------------------------------------|----------------------------------|
+| 1 | White powder is lethal | Tasting the powder was the explorer's last action before death. The powder has a distinct bitter-almond scent, consistent with known toxic substances. Ingestion triggered a lethal reaction. | Doesn't quantify dose; doesn't differentiate ingestion-vs-skin-contact |
+| 2 | White powder is potassium cyanide (KCN) | The powder has a strong bitter-almond odor — the signature olfactory marker of cyanide. Combined with its lethality, this identifies it as potassium cyanide (KCN). | Doesn't address other almond-smelling chemicals (benzaldehyde, mandelonitrile); doesn't quantify dose |
+| 3 | Red berry is non-toxic when uncontaminated | An explorer ate the red berry and survived. Therefore the red berry is safe to eat. | **Omits the "clean hands" precondition** — invites revision once cross-contamination is discovered |
+| 4 | Berry undergoes stage-based decay | I observed the same berry at multiple points in time. Its color, scale, and smell changed in a sequence of distinct phases — fresh → overripe → fermenting → rotting → decayed. The berry does not rot instantly; decay is staged. | Doesn't quantify time per stage; doesn't link decay rate to environment |
+| 5 | Temperature affects berry decay rate | Berries above ground decayed visibly faster than berries underground. The above-ground area is warmer. This suggests temperature affects decay rate. | Doesn't reference Q10 or quantify the rate ratio; doesn't isolate temperature from other variables (light, moisture) |
+| 6 | White powder causes cross-contamination | An explorer who never directly touched the powder ate the red berry and died. Earlier, a different explorer had touched the powder and then touched the same surface. Contact transferred residue from surface to skin to mouth. | Doesn't specify residue persistence time; doesn't differentiate contact transfer from airborne / waterborne mechanisms |
+| 7 | Above-ground and underground temperatures differ | Thermometer readings: above ground 26°C, underground 10°C. The two regions differ by 16°C. | Doesn't speculate on cause (insulation, sun exposure); doesn't generalize to other depths |
+| 8 | Sun, moon, and stars move at different speeds | Across two day-night cycles, the moon's position in the night sky shifted noticeably between cycles, while the sun's daily path stayed nearly identical. The stars rotated slowly relative to both. The three move at different speeds. | Doesn't quantify period ratios; doesn't recognize this as consistent with Earth-like rotation |
+| 9 | Celestial bodies share a rotation axis | Across two day-night cycles, the sun, moon, and stars all appeared to rotate around a common direction in the sky. They share a rotational axis. | Doesn't identify the axis (Polaris); doesn't quantify tilt |
+| 10 | The world has periodic boundary conditions | Walking far in one direction returned me to my starting area. The world's boundary is looped — walk far enough and you return. | Doesn't differentiate from a sphere (which also has this property) |
+| 11 | The world is flat | I traveled a long distance without seeing horizon curvature; distant objects do not disappear bottom-first. The world is flat, not spherical. | Doesn't quantify how far without curvature; doesn't account for fog / visual range limits |
+| 12 | Night sky matches real-world constellations | Several familiar constellations are visible in the night sky — their shapes match what is observed from Earth. The 647 universe uses real constellations. | Should name specific constellations; doesn't account for chance resemblance |
+| 13 | World is in the northern hemisphere | Polaris is visible in the night sky and stays at a fixed position while other stars rotate around it. This is a northern-hemisphere pattern. | Doesn't quantify Polaris altitude |
+| 14 | World is at approximately 40°N latitude | Polaris altitude approximately equals observer latitude. Polaris appears about 40° above the horizon. The world is at roughly 40°N latitude. | Doesn't account for measurement error; depends on player's astronomical knowledge |
+
+The grading rubric for each claim (see `js/cer.js CLAIM_DEFS[i].rubric`) is a strict criterion the player's submitted reasoning must meet — typically a more rigorous version of the demo's omitted point.
+
+### 8.4 Free-Form Notebook Pages
 
 Beyond CER entries, the Notebook supports free-form pages for:
 - Personal observations and sketches
@@ -437,19 +464,22 @@ When all five senses have been completed, in sequence:
 
 Onboarding is over. No further onboarding prompts appear in this session or any future session.
 
-#### Beat 6 — First Death + CER Reveal
+#### Beat 6 — Death-as-Reflection (every death)
 
-*Technically this beat is part of the live game, not onboarding. It is described here because it is the pedagogical culmination of the onboarding arc.*
+*Technically this beat is part of the live game, not onboarding. It is described here because the first occurrence is the pedagogical culmination of the onboarding arc — and it repeats throughout the game.*
 
-When the first character dies, the death plays normally (fade to black → *"[Name] collapsed."* → *"A new explorer arrives."*). Two seconds after the new explorer respawns:
+**Every** death triggers the same sequence. Between the death screen and the new character's spawn, the CER Board auto-opens with all entries currently loaded — including any newly enqueued by the just-completed death.
 
-1. The Notebook icon in the HUD pulses gently.
-2. The Notebook overlay auto-opens on the **CER Board** tab.
-3. The scaffolded entry corresponding to the death's `causeId` appears, fully pre-populated (Claim, Evidence, Reasoning). For a KCN direct-ingestion death it is §8.1 Entry #1.
-4. The **Submit** button has a subtle highlight.
-5. The player may submit, edit, or close. The game continues in the background; closing the notebook does not reverse or penalise.
+Sequence:
 
-If the player submits and the holistic grader returns `pass`:
+1. **Death screen** — `fade-to-black → "[Name] collapsed."` (existing behaviour, ~3 seconds).
+2. **CER Board overlay opens** — the Notebook overlay slides in on the CER Board tab. Any entries newly enqueued by this death (or by silent gate satisfactions since last visit) are highlighted.
+3. **Player engages or dismisses** — there is no time limit. The player may edit, submit, or close. The game does not advance until the player closes the overlay.
+4. **New explorer spawns** — `"A new explorer arrives. <Name>"` appears, then the world fades back in.
+
+The very first time this beat fires in a save, the first-enqueued entry is auto-populated as a demo (Claim + Evidence + Reasoning per §8.1). All other appearances of this beat show evidence-only entries for any new gates.
+
+If the player submits an entry and the holistic grader returns `pass`:
 
 - The Leaderboard auto-opens *one time only*, strictly gated on the transition `validatedClaims.length === 1`.
 - A brief reveal animation marks the newly-validated claim.
@@ -457,15 +487,20 @@ If the player submits and the holistic grader returns `pass`:
 
 This is the only time in the entire game that the Leaderboard opens automatically.
 
-### 12.4 Event-Triggered CER Entries
+### 12.4 Gate-Driven Entry Enqueue
 
-The prior design seeded all three scaffolded CER entries in `initNotebook()`, which confronted first-time players with three unexplained rows on their first open. The revised design reveals each entry only when the corresponding in-world event has occurred:
+Every claim has an evidence gate (§3.2). The moment a gate becomes satisfied — through any combination of in-game observations — the corresponding entry is silently enqueued onto the CER Board. This applies uniformly to all 14 claims; there is no special case for any individual claim.
 
-| Entry | Claim | Reveal trigger |
-|-------|-------|---------------|
-| #1 (complete demo) | 1 — White powder is lethal | First `kcn_ingestion` death |
-| #2 (Reasoning blank) | 3 — Berry is safe when uncontaminated | Any character eats berry clean-handed and survives |
-| #3 (Claim + Reasoning blank) | 6 — Cross-contamination | First `cross_contamination_death` |
+**Two phases**:
+
+1. **Silent enqueue** (any time): The instant a gate satisfies, the system constructs an entry with Evidence extracted from real records (§8.1) and adds it to `G.notebook.cerEntries`. No UI surfaces. The player may open the Notebook at any time to discover the entry and engage with it.
+2. **Death-triggered surfacing** (Beat 6, §12.3): On every death, the CER Board opens with all entries visible. New entries are visually highlighted.
+
+**First-ever entry rule**: the very first entry enqueued across the entire save is the *demo*. It receives full Claim + Evidence + Reasoning populate (Reasoning from the per-claim demo template, intentionally incomplete). All subsequent entries receive Evidence only.
+
+**Tie-break**: if multiple gates satisfy at the same instant, the demo position goes to the gate whose underlying observation occurred earliest in playtime. Within identical timestamps, ascending claim ID.
+
+**No hardcoded placeholder names** — never. All Evidence text is composed from `G.notebook.deaths` / `G.notebook.entries` / `G.notebook.observedBerryStages` / etc. as appropriate per claim.
 
 Before any trigger has fired, the CER tab shows only:
 

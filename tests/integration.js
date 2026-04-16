@@ -29,12 +29,15 @@ function fakeEl(id) {
   if (fakeDom[id]) return fakeDom[id];
   var el = {
     id: id,
+    dataset: {},
     classList: {
       _set: {},
       add: function(c) { this._set[c] = true; },
       remove: function(c) { delete this._set[c]; },
       contains: function(c) { return !!this._set[c]; }
     },
+    addEventListener: function() {},
+    removeEventListener: function() {},
     querySelectorAll: function() { return []; }
   };
   fakeDom[id] = el;
@@ -400,66 +403,70 @@ function runTombHistory() {
 }
 
 // =================================================================
-// Scenario 11 — Beat 6 + first-validation Leaderboard auto-open
+// Scenario 11 — New CER model: enqueue + first-ever demo + first-validation
 // =================================================================
-// Verifies GDD §12.3 Beat 6 and §12.8 first-validation celebration
-// semantics: both are strictly one-shot, gated on save-level flags.
+// Verifies the redesigned CER reveal model (GDD §8.1 / §12.3 / §12.4):
+//  - Gates silently enqueue entries
+//  - First-ever entry is the demo (full populate)
+//  - All subsequent entries are evidence-only
+//  - First validation auto-opens Leaderboard, one-shot
 function runBeat6(done) {
-  section('11. Beat 6 + first-validation');
+  section('11. CER enqueue + first-ever demo + first-validation');
   G.notebook = freshNotebook();
-
-  // Clear fake DOM state between tests
   fakeEl('leaderboard-overlay').classList._set = {};
   fakeEl('notebook-overlay').classList._set = {};
   fakeEl('notebook-btn').classList._set = {};
 
-  // Event-triggered reveal fires on death
-  sandbox.revealScaffoldedCerEntry(sandbox.scaffoldedClaimForCause('kcn_ingestion'));
-  ok(G.notebook.cerEntries.length === 1, 'KCN death reveals claim 1 entry');
-  ok(G.notebook.cerEntries[0].claimId === 1, 'Revealed entry is claim 1');
+  // (a) Silent enqueue from a death event
+  G.notebook.deaths.push({ characterName:'Alice', causeId:'kcn_ingestion', location:'Room 1', timestamp:30 });
+  sandbox.checkAndEnqueueGates();
+  ok(G.notebook.cerEntries.length === 1, 'KCN death enqueues one entry');
+  var e1 = G.notebook.cerEntries[0];
+  ok(e1.claimId === 1, 'Enqueued entry is claim 1');
+  ok(e1.isDemoEntry === true, 'First-ever entry is demo');
+  ok(e1.claim && e1.claim.length > 0, 'Demo entry has populated claim');
+  ok(e1.reasoning && e1.reasoning.length > 0, 'Demo entry has populated reasoning');
+  ok(G.notebook._demoEntryAssigned === true, '_demoEntryAssigned flag set');
 
-  // maybeTriggerBeat6 should not re-fire
-  var maybeTriggerBeat6 = sandbox.maybeTriggerBeat6;
-  maybeTriggerBeat6('kcn_ingestion');
-  ok(G.notebook._beat6Fired === true, 'Beat 6 flag set on first call');
-  var entriesAfter = G.notebook.cerEntries.length;
-  maybeTriggerBeat6('kcn_ingestion');
-  ok(G.notebook.cerEntries.length === entriesAfter, 'Beat 6 second call is no-op');
+  // (b) Second gate satisfaction → evidence-only entry
+  G.notebook.berryCleanEatenSurvived = true;
+  G.notebook.entries.push({ characterName:'Bob', action:'taste', target:'Red Berry', location:'House', timestamp:60, result:'Sweet, juicy.' });
+  sandbox.checkAndEnqueueGates();
+  ok(G.notebook.cerEntries.length === 2, 'Second gate enqueues second entry');
+  var e2 = G.notebook.cerEntries[1];
+  ok(e2.claimId === 3, 'Second entry is claim 3');
+  ok(e2.isDemoEntry === false, 'Second entry is NOT demo');
+  ok(e2.claim === '', 'Second entry claim is blank');
+  ok(e2.reasoning === '', 'Second entry reasoning is blank');
+  ok(e2.evidence && e2.evidence.length > 0, 'Second entry evidence is populated');
 
-  // First-validation auto-open: 0→1 transition opens leaderboard after 1.5s
+  // (c) Idempotence — re-checking gates does not duplicate
+  sandbox.checkAndEnqueueGates();
+  ok(G.notebook.cerEntries.length === 2, 'Re-check does not duplicate');
+
+  // (d) First-validation Leaderboard auto-open (one-shot)
   sandbox.IS_LOCAL = false;
-  G.notebook.deaths.push({ causeId: 'kcn_ingestion' });
-  var entry = {
-    claim: 'The white powder is lethal when any explorer ingests it.',
-    evidence: 'Alice tasted it and collapsed immediately after.',
-    reasoning: 'Tasting the powder was her last action; the death is causally linked to that ingestion.',
-    validated: false
-  };
-  G.notebook.cerEntries.push(entry);
-  sandbox.submitCerEntry(entry);
+  e1.claim = 'The white powder is lethal when any explorer ingests it.';
+  e1.evidence = 'Alice tasted it and collapsed immediately after.';
+  e1.reasoning = 'Tasting the powder was her last action; the death is causally linked to that ingestion.';
+  sandbox.submitCerEntry(e1);
 
-  // Wait for the 1.5s delayed leaderboard auto-open + 6s auto-close
   setTimeout(function() {
-    ok(entry.validated === true, 'Entry validated via offline grader');
-    ok(G.notebook._firstValidationCelebrated === true, 'firstValidationCelebrated flag set');
+    ok(e1.validated === true, 'Entry validated via offline grader');
+    ok(G.notebook._firstValidationCelebrated === true, 'firstValidationCelebrated set');
     ok(fakeEl('leaderboard-overlay').classList.contains('active'), 'Leaderboard auto-opened on first validation');
 
-    // Submit a second claim (different id) — must NOT re-open leaderboard
+    // Second validation must NOT re-open
     fakeEl('leaderboard-overlay').classList._set = {};
     G.notebook.pbcCrossed = true;
-    var entry2 = {
-      claimId: 10,
-      claim: 'The world loops back on itself',
-      evidence: 'I walked west and ended up east.',
-      reasoning: 'Crossing the boundary repeats the starting area, indicating a periodic topology.',
-      validated: false
-    };
-    G.notebook.cerEntries.push(entry2);
-    sandbox.submitCerEntry(entry2);
-
+    sandbox.checkAndEnqueueGates(); // enqueue claim 10/11
+    var e10 = G.notebook.cerEntries.find(function(e){ return e.claimId === 10; });
+    e10.claim = 'The world loops back on itself';
+    e10.evidence = 'I walked west and ended up east.';
+    e10.reasoning = 'Crossing the boundary repeats the starting area, indicating periodic topology.';
+    sandbox.submitCerEntry(e10);
     setTimeout(function() {
-      ok(entry2.validated === true, 'Second entry validated');
-      ok(G.notebook.validatedClaims.length === 2, 'Two claims validated');
+      ok(e10.validated === true, 'Second entry validated');
       ok(!fakeEl('leaderboard-overlay').classList.contains('active'), 'Leaderboard does NOT auto-open for subsequent validations');
       done();
     }, 1800);

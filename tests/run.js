@@ -146,7 +146,9 @@ assert(evidenceGateMet(12), 'Claim 12: night obs → unlocked');
 assert(evidenceGateMet(13), 'Claim 13: night obs → unlocked');
 
 G.notebook = freshNotebook();
-assert(evidenceGateMet(14), 'Claim 14: external gate → always ready');
+assert(!evidenceGateMet(14), 'Claim 14: locked until night-sky observation made');
+G.notebook.skyObservations = [{isNight:true}];
+assert(evidenceGateMet(14), 'Claim 14: night-sky observation → unlocked');
 
 // matchClaimId
 assertEq(matchClaimId('the white powder is KCN'), 2, 'match: KCN → 2');
@@ -167,46 +169,78 @@ assertEq(matchClaimId('氰化钾'), 2, 'match zh: 氰化钾 → 2');
 assertEq(matchClaimId('交叉污染'), 6, 'match zh: 交叉污染 → 6');
 assertEq(matchClaimId('回到原点'), 10, 'match zh: 回到原点 → 10');
 
-// Scaffolded seeds (bulk back-compat helper)
-G.notebook = freshNotebook();
-seedScaffoldedCerEntries();
-assertEq(G.notebook.cerEntries.length, 3, 'seeds (bulk): 3 entries');
-var bySeed = {};
-for (var s_i = 0; s_i < G.notebook.cerEntries.length; s_i++) {
-  var _e = G.notebook.cerEntries[s_i];
-  bySeed[_e.claimId] = _e;
-}
-var s1 = bySeed[1], s3 = bySeed[3], s6 = bySeed[6];
-assert(s1 && s1.claim && s1.evidence && s1.reasoning, 'seed claim 1 fully populated');
-assert(s3 && s3.claim && s3.evidence && !s3.reasoning, 'seed claim 3 reasoning blank');
-assert(s6 && !s6.claim && s6.evidence && !s6.reasoning, 'seed claim 6 only evidence');
-assert(s1.scaffolded && s3.scaffolded && s6.scaffolded, 'all seeds flagged scaffolded');
-seedScaffoldedCerEntries();
-assertEq(G.notebook.cerEntries.length, 3, 'seeds (bulk): idempotent');
+// New CER model (GDD §8.1 v2): first-ever entry is demo, rest are evidence-only
 
-// Event-triggered reveal (GDD §12.4) — new default path
+var enqueueCerEntry = sandbox.enqueueCerEntry;
+var checkAndEnqueueGates = sandbox.checkAndEnqueueGates;
 var revealScaffoldedCerEntry = sandbox.revealScaffoldedCerEntry;
 var scaffoldedClaimForCause = sandbox.scaffoldedClaimForCause;
 
+// Demo entry behavior
 G.notebook = freshNotebook();
-assertEq(G.notebook.cerEntries.length, 0, 'fresh notebook has no seeds');
-revealScaffoldedCerEntry(1);
-assertEq(G.notebook.cerEntries.length, 1, 'reveal claim 1 → 1 entry');
-assertEq(G.notebook.cerEntries[0].claimId, 1, 'revealed entry claim = 1');
-revealScaffoldedCerEntry(1);
-assertEq(G.notebook.cerEntries.length, 1, 'reveal same claim twice → idempotent');
-revealScaffoldedCerEntry(3);
-assertEq(G.notebook.cerEntries.length, 2, 'reveal claim 3 → 2 entries');
-revealScaffoldedCerEntry(6);
-assertEq(G.notebook.cerEntries.length, 3, 'reveal claim 6 → 3 entries');
-var unknownSeed = revealScaffoldedCerEntry(99);
-assert(unknownSeed === null, 'reveal unknown claim → null');
+G.notebook.deaths.push({ characterName:'TestA', causeId:'kcn_ingestion', location:'Room 1', timestamp:30 });
+var first = enqueueCerEntry(1, 30);
+assert(first !== null, 'first enqueue returns entry');
+assertEq(first.claimId, 1, 'first entry claimId=1');
+assert(first.isDemoEntry === true, 'first entry isDemoEntry=true');
+assert(first.claim && first.claim.length > 0, 'first entry has populated claim');
+assert(first.evidence && first.evidence !== 'evidence.unavailable', 'first entry evidence extracted (non-placeholder)');
+assert(first.reasoning && first.reasoning.length > 0, 'first entry has populated reasoning (demo template)');
+assertEq(G.notebook._demoEntryAssigned, true, '_demoEntryAssigned flag set');
 
-// scaffoldedClaimForCause mapping
+// Subsequent entries are evidence-only
+G.notebook.berryCleanEatenSurvived = true;
+G.notebook.entries.push({ characterName:'TestB', action:'taste', target:'Red Berry', location:'House', timestamp:45, result:'Sweet, harmless.' });
+var second = enqueueCerEntry(3, 45);
+assert(second !== null, 'second enqueue returns entry');
+assert(second.isDemoEntry === false, 'second entry isDemoEntry=false');
+assertEq(second.claim, '', 'second entry claim is blank');
+assertEq(second.reasoning, '', 'second entry reasoning is blank');
+assert(second.evidence && second.evidence !== 'evidence.unavailable', 'second entry evidence extracted (non-placeholder)');
+
+// Idempotence
+var dup = enqueueCerEntry(1, 30);
+assert(dup === null, 'enqueue same claim twice → null (idempotent)');
+assertEq(G.notebook.cerEntries.length, 2, 'no duplicate entries created');
+
+// Unknown claim
+var bad = enqueueCerEntry(99, 0);
+assert(bad === null, 'enqueue unknown claim → null');
+
+// checkAndEnqueueGates batches all newly-met gates
+G.notebook = freshNotebook();
+G.notebook.pbcCrossed = true;
+G.notebook.thermometerLocations = ['above','below'];
+var queued = checkAndEnqueueGates();
+assert(queued.length >= 3, 'checkAndEnqueueGates: PBC+thermometer met (claims 5,7,10,11) → multiple enqueues');
+// Only the first (lowest claim ID with gate met) gets demo
+var demos = G.notebook.cerEntries.filter(function(e){ return e.isDemoEntry; });
+assertEq(demos.length, 1, 'exactly one demo entry across batch');
+
+// Back-compat seedScaffoldedCerEntries still produces 3 entries
+G.notebook = freshNotebook();
+G.notebook.deaths.push({ characterName:'A', causeId:'kcn_ingestion', location:'r1', timestamp:1 });
+G.notebook.berryCleanEatenSurvived = true;
+G.notebook.entries.push({ characterName:'A', action:'taste', target:'Red Berry', location:'h', timestamp:2, result:'safe' });
+G.notebook.crossContaminationDeathSeen = true;
+G.notebook.deaths.push({ characterName:'B', causeId:'cross_contamination_death', location:'r1', timestamp:3 });
+seedScaffoldedCerEntries();
+assertEq(G.notebook.cerEntries.length, 3, 'back-compat seed: 3 entries');
+seedScaffoldedCerEntries();
+assertEq(G.notebook.cerEntries.length, 3, 'back-compat seed: idempotent');
+
+// scaffoldedClaimForCause mapping (still used by older code paths)
 assertEq(scaffoldedClaimForCause('kcn_ingestion'), 1, 'cause: kcn_ingestion → claim 1');
 assertEq(scaffoldedClaimForCause('cross_contamination_death'), 6, 'cause: cross_contam → claim 6');
 assertEq(scaffoldedClaimForCause('radiation_exposure'), null, 'cause: radiation → null');
 assertEq(scaffoldedClaimForCause('unknown'), null, 'cause: unknown → null');
+
+// Insufficient-data fallback: enqueue a claim whose evidence cannot be extracted
+G.notebook = freshNotebook();
+// Force the gate to look met without data backing it
+G.notebook.pbcCrossed = true;  // claim 10 gate met
+var pbcEntry = enqueueCerEntry(10, 5);
+assert(pbcEntry.evidence && pbcEntry.evidence.length > 0, 'claim 10 with pbcCrossed produces evidence text');
 
 // finalizeCer
 G.notebook = freshNotebook();

@@ -439,6 +439,7 @@ function updateDayNight(elapsed) {
     if (cycle > (G.notebook.lastCycleMark || 0)) {
       G.notebook.dayNightCycles = cycle;
       G.notebook.lastCycleMark = cycle;
+      if (typeof checkAndEnqueueGates === 'function') checkAndEnqueueGates();
     }
     G._skyIsNight = phase > 0.5;
   }

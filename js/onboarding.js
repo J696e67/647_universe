@@ -33,10 +33,23 @@ function initOnboarding() {
   };
   G.onboardingComplete = stored;
 
+  // Restore mid-onboarding progress from a prior session if any
+  if (G._pendingOnboarding) {
+    var saved = G._pendingOnboarding;
+    if (saved.sensesCompleted) G.onboarding.sensesCompleted = saved.sensesCompleted;
+    if (typeof saved.stage === 'string') G.onboarding.stage = saved.stage;
+    if (typeof saved.walkHintShown === 'boolean') G.onboarding.walkHintShown = saved.walkHintShown;
+    if (typeof saved.houseHintShown === 'boolean') G.onboarding.houseHintShown = saved.houseHintShown;
+    delete G._pendingOnboarding;
+  }
+
+  // Compute pillar fraction from sense count so partial progress restores
+  var done = 0;
+  for (var k in G.onboarding.sensesCompleted) if (G.onboarding.sensesCompleted[k]) done++;
   if (stored) {
     setMazeEntranceVisible(1);
   } else {
-    setMazeEntranceVisible(0);
+    setMazeEntranceVisible(done * 0.2);
   }
 }
 

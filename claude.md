@@ -105,17 +105,9 @@ Full design spec: see GDD.md.
 }
 ```
 
-### CER Entry (player-authored)
-```javascript
-{
-  id: "cer_001",
-  claim: "White powder is lethal",
-  evidence: "Alice tasted white powder and collapsed (Death Record #1)",
-  reasoning: "Tasting the powder was Alice's last action before death...",
-  validated: false,         // true when both evidence gate and articulation gate satisfied
-  tier: 1
-}
-```
+### CER Entry (overview)
+
+CER entries are dynamically enqueued by gate-watcher hooks scattered across `senses.js`, `effects.js`, `sky.js`, `player.js`. The contract is documented in detail under "CER Entry (system-enqueued, possibly player-edited)" further below — see that section for the full schema and design rules.
 
 ### Notebook (Persistent)
 ```javascript
@@ -125,7 +117,7 @@ Full design spec: see GDD.md.
     { characterName: "Alice", timestamp: 120.5, location: "Room 1",
       causeId: "kcn_ingestion", lastActions: ["touched White Powder", "tasted White Powder"] }
   ],
-  cerEntries: [],               // player-authored CER Board entries (3 scaffolded on init, rest free-form)
+  cerEntries: [],               // player-authored CER Board entries (3 scaffolded entries are revealed by event; their evidence text is assembled from real Death/Notebook records — never hardcoded names)
   validatedClaims: [],          // ids of validated knowledge claims (1..14)
   tombstoneDialogue: [],        // full dialogue history
   totalCharacters: 2,
@@ -142,20 +134,29 @@ Full design spec: see GDD.md.
 }
 ```
 
-### CER Entry (player-authored, in notebook.cerEntries)
+### CER Entry (system-enqueued, possibly player-edited)
 ```javascript
 {
-  id: "cer_001",
-  claimId: 1,                 // matches a row in the 14-claim table
-  claim: "White powder is lethal",
-  evidence: "Alice tasted white powder and collapsed (Death Record #1)",
-  reasoning: "Tasting was her last action...",
-  validated: false,           // true only when evidence gate AND holistic articulation grader pass
-  tier: 1,                    // copied from claim def
-  scaffolded: false,          // true for the 3 seed entries
-  _feedback: null             // transient grader response
+  id: "cer_<timestamp>_<claimId>",
+  claimId: 3,
+  claim: "Red berry is non-toxic when uncontaminated",  // populated only on demo entry; "" otherwise
+  evidence: "Alice ate the red berry in Room 1 with clean hands and survived (notebook entry t=0:30).",  // ALWAYS extracted from real notebook records — never hardcoded
+  reasoning: "An explorer ate the red berry and survived...",  // populated only on demo entry; "" otherwise
+  validated: false,
+  tier: 1,
+  isDemoEntry: true,            // true only for the very first entry ever enqueued in this save
+  enqueuedAt: 31.2,             // gameTime when this entry was created
+  gateMetAt: 30.5,              // gameTime when the underlying evidence gate was satisfied (used for tie-break)
+  _feedback: null
 }
 ```
+
+**Critical CER design contract** (GDD §8.1 Foundational Principles):
+1. **Evidence is always real** — extracted at enqueue time from `G.notebook.deaths` / `G.notebook.entries` / `observedBerryStages` / `skyObservations` / `thermometerLocations` etc. No hardcoded character names anywhere.
+2. **One demo per save** — the very first entry enqueued is fully populated (claim + evidence + reasoning); all subsequent entries get evidence only.
+3. **Demo reasoning is intentionally incomplete** — see GDD §8.3 for the 14 demo templates; each omits a key qualifier to invite later revision.
+4. **Tie-break for demo position**: by `gateMetAt` ascending; same-timestamp ties by `claimId` ascending.
+5. **Player-authored claim text** is matched to one of the 14 canonical claims by the holistic Claude grader (semantic, not keyword). Lexical `matchClaimId()` may be used as a first-pass shortlist but the LLM has the final word.
 
 ## Interaction System (Five Senses)
 

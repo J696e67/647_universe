@@ -189,6 +189,8 @@ function doLook(obj, char, name, room) {
   }
   showMsg(text);
   addNotebookEntry(L('action.look'), name, room, text);
+  // After any sense observation that mutates evidence state, scan all gates
+  if (typeof checkAndEnqueueGates === 'function') checkAndEnqueueGates();
 }
 
 function doListen(obj, char, name, room) {
@@ -328,11 +330,8 @@ function doTaste(obj, char, name, room) {
       if (obj.userData.isBerry && !tasteProp.lethal &&
           char.handContamination.length === 0 &&
           (!obj.userData.contamination || obj.userData.contamination.length === 0)) {
-        var was = G.notebook.berryCleanEatenSurvived;
         G.notebook.berryCleanEatenSurvived = true;
-        if (!was && typeof revealScaffoldedCerEntry === 'function') {
-          revealScaffoldedCerEntry(3);
-        }
+        if (typeof checkAndEnqueueGates === 'function') checkAndEnqueueGates();
       }
 
       // DECAYED berry → disintegrates, leave seed

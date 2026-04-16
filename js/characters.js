@@ -28,8 +28,12 @@ function spawnCharacter() {
   // Update UI
   document.getElementById('char-name').textContent = name;
 
-  // Reset tombstone greeting for new character
-  G.tombGreetingShown = false;
+  // Fresh character = fresh Tombstone conversation (GDD §7.4 / §12)
+  if (typeof resetTombstoneConversation === 'function') {
+    resetTombstoneConversation();
+  } else {
+    G.tombGreetingShown = false;
+  }
 }
 
 function respawnCharacter() {

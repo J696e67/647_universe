@@ -88,11 +88,8 @@ function triggerDeath(message, causeId) {
     G.notebook.crossContaminationDeathSeen = true;
   }
 
-  // Event-triggered CER seed reveal (GDD §12.4)
-  if (typeof revealScaffoldedCerEntry === 'function' && typeof scaffoldedClaimForCause === 'function') {
-    var sc = scaffoldedClaimForCause(causeId);
-    if (sc) revealScaffoldedCerEntry(sc);
-  }
+  // Death satisfies one or more gates (claim 1, 2, 6 etc.) — scan all
+  if (typeof checkAndEnqueueGates === 'function') checkAndEnqueueGates();
 
   // Place gravestone on PBC boundary ring
   createDeathGravestone(deathRecord);
@@ -111,21 +108,41 @@ function triggerDeath(message, causeId) {
 
   setTimeout(function() { deathMsg.style.opacity = '1'; }, 500);
 
-  var nextName = G.characterNames[G.characterIndex + 1] || 'Explorer ' + (G.characterIndex + 2);
-  setTimeout(function() {
-    deathNew.innerHTML = L('death.new_explorer', {next: nextName});
-    deathNew.style.opacity = '1';
-  }, 3000);
-
-  var isFirstDeath = G.notebook.deaths.length === 1;
+  // Death sequence (GDD §12.3 Beat 6):
+  //   t=0   fade to black
+  //   t=0.5 "X collapsed"
+  //   t=3   fade death screen out
+  //   t=3.5 CER board auto-opens (no time limit; player closes when ready)
+  //   on close: short fade → "A new explorer arrives. <Name>" → respawn
   setTimeout(function() {
     deathScreen.classList.remove('active');
     deathMsg.style.opacity = '0';
-    deathNew.style.opacity = '0';
-    respawnCharacter();
-    // Beat 6 (GDD §12.3): auto-open CER 2s after first respawn
-    if (isFirstDeath && typeof maybeTriggerBeat6 === 'function') {
-      maybeTriggerBeat6(causeId);
+  }, 3000);
+
+  setTimeout(function() {
+    if (typeof openCerBoardForDeath === 'function') {
+      openCerBoardForDeath(function() {
+        // Player closed the CER board — show new-explorer message and respawn
+        var nextName = G.characterNames[G.characterIndex + 1] || 'Explorer ' + (G.characterIndex + 2);
+        deathScreen.classList.add('active');
+        deathNew.innerHTML = L('death.new_explorer', {next: nextName});
+        deathNew.style.opacity = '1';
+        setTimeout(function() {
+          deathScreen.classList.remove('active');
+          deathNew.style.opacity = '0';
+          respawnCharacter();
+        }, 2500);
+      });
+    } else {
+      // Fallback if cer.js not loaded — direct respawn
+      var nextName = G.characterNames[G.characterIndex + 1] || 'Explorer ' + (G.characterIndex + 2);
+      deathNew.innerHTML = L('death.new_explorer', {next: nextName});
+      deathNew.style.opacity = '1';
+      setTimeout(function() {
+        deathScreen.classList.remove('active');
+        deathNew.style.opacity = '0';
+        respawnCharacter();
+      }, 3000);
     }
-  }, 6000);
+  }, 3500);
 }
