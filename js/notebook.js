@@ -12,6 +12,7 @@ function initNotebook() {
     // CER Board (player-authored)
     cerEntries: [],
     validatedClaims: [],
+    freeFormValidatedClaims: [],
     // Evidence tracking for 14-claim gates
     observedBerryStages: {},   // berryUuid → { stages: [0,1,...], clean: bool }
     skyObservations: [],       // [{timestamp, pitch, isNight}]
@@ -255,6 +256,7 @@ function migrateNotebookSchema() {
   if (!Array.isArray(n.tombstoneDialogue))  n.tombstoneDialogue = [];
   if (!Array.isArray(n.cerEntries))         n.cerEntries = [];
   if (!Array.isArray(n.validatedClaims))    n.validatedClaims = [];
+  if (!Array.isArray(n.freeFormValidatedClaims)) n.freeFormValidatedClaims = [];
   if (!Array.isArray(n.skyObservations))    n.skyObservations = [];
   if (!Array.isArray(n.thermometerLocations)) n.thermometerLocations = [];
   if (typeof n.observedBerryStages !== 'object' || !n.observedBerryStages) n.observedBerryStages = {};

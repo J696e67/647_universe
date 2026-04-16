@@ -456,11 +456,14 @@ function runBeat6(done) {
     ok(G.notebook._firstValidationCelebrated === true, 'firstValidationCelebrated set');
     ok(fakeEl('leaderboard-overlay').classList.contains('active'), 'Leaderboard auto-opened on first validation');
 
-    // Second validation must NOT re-open
+    // Second validation must NOT re-open. Tier 3 claims (PBC) don't
+    // auto-enqueue — must call enqueueCerEntry directly (simulating the
+    // path where a player writes a free-form claim that matchClaimId
+    // routes to claim 10).
     fakeEl('leaderboard-overlay').classList._set = {};
     G.notebook.pbcCrossed = true;
-    sandbox.checkAndEnqueueGates(); // enqueue claim 10/11
-    var e10 = G.notebook.cerEntries.find(function(e){ return e.claimId === 10; });
+    var e10 = sandbox.enqueueCerEntry(10, G.gameTime);
+    ok(e10 !== null, 'manual enqueue of tier 3 claim 10 succeeds');
     e10.claim = 'The world loops back on itself';
     e10.evidence = 'I walked west and ended up east.';
     e10.reasoning = 'Crossing the boundary repeats the starting area, indicating periodic topology.';

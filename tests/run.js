@@ -207,15 +207,24 @@ assertEq(G.notebook.cerEntries.length, 2, 'no duplicate entries created');
 var bad = enqueueCerEntry(99, 0);
 assert(bad === null, 'enqueue unknown claim → null');
 
-// checkAndEnqueueGates batches all newly-met gates
+// checkAndEnqueueGates batches newly-met VISIBLE-tier gates only.
+// Tier 3 claims (PBC, sky) do NOT auto-enqueue; player must use "+ New Claim".
 G.notebook = freshNotebook();
-G.notebook.pbcCrossed = true;
-G.notebook.thermometerLocations = ['above','below'];
+G.notebook.pbcCrossed = true;             // claims 10, 11 (tier 3 — must NOT enqueue)
+G.notebook.thermometerLocations = ['above','below']; // claims 5 (T2) and 7 (T1) — should enqueue
 var queued = checkAndEnqueueGates();
-assert(queued.length >= 3, 'checkAndEnqueueGates: PBC+thermometer met (claims 5,7,10,11) → multiple enqueues');
+assertEq(queued.length, 2, 'enqueue: only visible-tier claims 5+7 (tier 3 PBC/flat blocked)');
+assert(queued.indexOf(5) !== -1 && queued.indexOf(7) !== -1, 'queued contains 5 and 7');
+assert(queued.indexOf(10) === -1 && queued.indexOf(11) === -1, 'queued does NOT contain hidden-tier 10/11');
 // Only the first (lowest claim ID with gate met) gets demo
 var demos = G.notebook.cerEntries.filter(function(e){ return e.isDemoEntry; });
 assertEq(demos.length, 1, 'exactly one demo entry across batch');
+
+// But you CAN still enqueue tier 3 manually (e.g., when player writes a
+// free-form claim that matchClaimId routes to tier 3) — that path goes
+// through enqueueCerEntry directly, not checkAndEnqueueGates.
+var pbcManual = enqueueCerEntry(10, 100);
+assert(pbcManual !== null, 'enqueueCerEntry can still create tier 3 entries directly');
 
 // Back-compat seedScaffoldedCerEntries still produces 3 entries
 G.notebook = freshNotebook();
@@ -283,9 +292,9 @@ assertEq(getDecayRate(20), 1.0, 'Q10 @20°C = 1');
 assertEq(getDecayRate(30), 2.0, 'Q10 @30°C = 2');
 assertEq(getDecayRate(10), 0.5, 'Q10 @10°C = 0.5');
 
-// CLAIM_DEFS integrity
+// CLAIM_DEFS integrity (new 3-tier structure: 4 / 3 / 7 hidden)
 assertEq(CLAIM_DEFS.length, 14, '14 claims defined');
-var tiers = {1:0,2:0,3:0,4:0,5:0,6:0};
+var tiers = {1:0,2:0,3:0};
 var ids = {};
 for (var i = 0; i < CLAIM_DEFS.length; i++) {
   var d = CLAIM_DEFS[i];
@@ -296,12 +305,24 @@ for (var i = 0; i < CLAIM_DEFS.length; i++) {
   ids[d.id] = true;
   tiers[d.tier]++;
 }
-assertEq(tiers[1], 2, 'Tier 1 has 2 claims');
-assertEq(tiers[2], 1, 'Tier 2 has 1 claim');
-assertEq(tiers[3], 2, 'Tier 3 has 2 claims');
-assertEq(tiers[4], 3, 'Tier 4 has 3 claims');
-assertEq(tiers[5], 3, 'Tier 5 has 3 claims');
-assertEq(tiers[6], 3, 'Tier 6 has 3 claims');
+assertEq(tiers[1], 4, 'Tier 1 has 4 claims (leaderboard)');
+assertEq(tiers[2], 3, 'Tier 2 has 3 claims (leaderboard)');
+assertEq(tiers[3], 7, 'Tier 3 has 7 claims (hidden)');
+assertEq(sandbox.LEADERBOARD_VISIBLE_TIERS.length, 2, 'two tiers visible on leaderboard');
+assert(sandbox.LEADERBOARD_VISIBLE_TIERS.indexOf(1) !== -1 && sandbox.LEADERBOARD_VISIBLE_TIERS.indexOf(2) !== -1, 'visible tiers are 1 and 2');
+// Spot-check claim assignments
+var byId = {};
+for (var vi = 0; vi < CLAIM_DEFS.length; vi++) byId[CLAIM_DEFS[vi].id] = CLAIM_DEFS[vi];
+assertEq(byId[3].tier, 1, 'claim 3 (berry safe) in tier 1');
+assertEq(byId[1].tier, 1, 'claim 1 (powder toxic) in tier 1');
+assertEq(byId[2].tier, 1, 'claim 2 (KCN) in tier 1');
+assertEq(byId[7].tier, 1, 'claim 7 (temp differ) in tier 1');
+assertEq(byId[4].tier, 2, 'claim 4 (decay) in tier 2');
+assertEq(byId[5].tier, 2, 'claim 5 (temp→decay) in tier 2');
+assertEq(byId[6].tier, 2, 'claim 6 (cross-contam) in tier 2');
+assertEq(byId[8].tier, 3, 'claim 8 (celestial speeds) hidden');
+assertEq(byId[10].tier, 3, 'claim 10 (PBC) hidden');
+assertEq(byId[14].tier, 3, 'claim 14 (latitude) hidden');
 
 // ---- Report ----
 if (TEST.fail === 0) {

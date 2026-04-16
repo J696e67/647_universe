@@ -181,6 +181,8 @@ en: {
   'leaderboard.tier': 'Tier',
   'leaderboard.locked': 'Locked — evidence gate not yet met',
   'leaderboard.evidence_ready': 'Evidence ready — articulate on the CER Board',
+  'leaderboard.deeper': 'Deeper Discoveries',
+  'leaderboard.player_discoveries': 'Player Discoveries',
   // Thermometer
   'thermo.read': 'Thermometer reads {temp}°C. ({where})',
   'thermo.above': 'above ground',
@@ -431,6 +433,8 @@ zh: {
   'leaderboard.tier': '\u7B49\u7EA7',
   'leaderboard.locked': '\u672A\u89E3\u9501 \u2014 \u8BC1\u636E\u4E0D\u8DB3',
   'leaderboard.evidence_ready': '\u8BC1\u636E\u5DF2\u5907 \u2014 \u5728 CER \u677F\u4E0A\u8868\u8FF0',
+  'leaderboard.deeper': '\u66F4\u6DF1\u7684\u53D1\u73B0',
+  'leaderboard.player_discoveries': '\u73A9\u5BB6\u7684\u4E3B\u5F20',
   // Thermometer
   'thermo.read': '\u6E29\u5EA6\u8BA1\u663E\u793A {temp}\u00B0C\u3002\uFF08{where}\uFF09',
   'thermo.above': '\u5730\u4E0A',

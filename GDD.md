@@ -341,7 +341,11 @@ Each of the 14 claims has a *demo reasoning template* and a *grading rubric*. Th
 | 13 | World is in the northern hemisphere | Polaris is visible in the night sky and stays at a fixed position while other stars rotate around it. This is a northern-hemisphere pattern. | Doesn't quantify Polaris altitude |
 | 14 | World is at approximately 40°N latitude | Polaris altitude approximately equals observer latitude. Polaris appears about 40° above the horizon. The world is at roughly 40°N latitude. | Doesn't account for measurement error; depends on player's astronomical knowledge |
 
-The grading rubric for each claim (see `js/cer.js CLAIM_DEFS[i].rubric`) is a strict criterion the player's submitted reasoning must meet — typically a more rigorous version of the demo's omitted point.
+**Rubric philosophy — minimal sufficient criterion.** The grading rubric for each claim (see `js/cer.js CLAIM_DEFS[i].rubric`) is the *minimum* a sound CER chain must meet — a valid logical inference from the evidence to the claim, matched to what is knowable within the scope of that claim's own evidence gate. The rubric **does not** demand the player anticipate refinements that require knowledge from other claims.
+
+Example: claim 3 ("Red berry is non-toxic when uncontaminated") passes on a simple inference from clean-handed survival — "an explorer ate the berry and survived; therefore it is non-toxic." The clean-handed qualifier is the *territory of claim 6* (cross-contamination); the player naturally revisits claim 3 and refines their reasoning only after they have discovered claim 6. That revision is a voluntary cognitive move, not a grader-enforced requirement. The "deliberate trap" is in the player's own return to an earlier entry, not in the grader rejecting their initial submission.
+
+Demo reasoning templates can be — and are — strictly *less* complete than the rubric requires. They are starting points, not finish lines.
 
 ### 8.4 Free-Form Notebook Pages
 
@@ -501,6 +505,8 @@ Every claim has an evidence gate (§3.2). The moment a gate becomes satisfied �
 **Tie-break**: if multiple gates satisfy at the same instant, the demo position goes to the gate whose underlying observation occurred earliest in playtime. Within identical timestamps, ascending claim ID.
 
 **No hardcoded placeholder names** — never. All Evidence text is composed from `G.notebook.deaths` / `G.notebook.entries` / `G.notebook.observedBerryStages` / etc. as appropriate per claim.
+
+**Hidden-tier auto-enqueue suppressed.** Only claims in `LEADERBOARD_VISIBLE_TIERS` (tiers 1 and 2) are auto-enqueued onto the CER Board when their gates satisfy. Tier 3 (PBC, sky, latitude, etc.) gates still operate internally — but the player must discover and articulate those claims themselves via the *+ New Claim* button. Their presence is never hinted at on either the CER Board or the leaderboard until the player validates one.
 
 Before any trigger has fired, the CER tab shows only:
 

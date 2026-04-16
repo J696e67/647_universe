@@ -1,25 +1,59 @@
 'use strict';
 
-// ===================== CER BOARD — 14 CLAIMS × 6 TIERS =====================
-// Claim IDs correspond to GDD §3.2 / CLAUDE.md knowledge-claim table.
-// Each claim has an evidence-gate predicate and a short articulation rubric
-// used by the holistic Claude evaluator.
+// ===================== CER BOARD — 14 CANONICAL CLAIMS =====================
+// Three tiers — two visible on the leaderboard, one hidden.
+//
+//   Tier 1 (leaderboard, 4 claims):
+//     3  Red berry is non-toxic
+//     1  White powder is toxic
+//     2  White powder is potassium cyanide
+//     7  Above- and below-ground temperatures differ
+//
+//   Tier 2 (leaderboard, 3 claims):
+//     4  Berry undergoes stage-based decay
+//     5  Temperature affects berry decay rate
+//     6  White powder causes cross-contamination
+//
+//   Tier 3 — HIDDEN on the leaderboard (7 claims). Evidence gates still
+//   operate normally; CER Board still accepts these entries. But the
+//   leaderboard does not list them until each is individually validated.
+//   Players may also submit free-form claims outside these 14 — if the
+//   Claude grader judges the CER logic sound, those appear too.
+//
+//     8  Sun, moon, stars move at different speeds
+//     9  Celestial bodies share a rotation axis
+//    10  World has periodic boundary conditions
+//    11  World is flat
+//    12  Night sky matches real constellations
+//    13  World is in the northern hemisphere
+//    14  World is at approximately 40°N latitude
 
 var CLAIM_DEFS = [
+  // ---- Tier 1 (visible on leaderboard) ----
+  { id: 3,  tier: 1, titleKey: 'claim.3.title',
+    evidence: function(n) { return n.berryCleanEatenSurvived === true; },
+    // Minimal sufficient rubric — matches the scope of the evidence gate
+    // (clean-handed survival). The refinement "only when uncontaminated"
+    // is the territory of claim 6 (cross-contamination), not a requirement
+    // on this rubric. Players naturally revisit claim 3 AFTER discovering
+    // claim 6 — that's the pedagogical trap, not a grader rejection.
+    rubric: 'Player claims the red berry is non-toxic to explorers who eat it, supported by evidence of an explorer surviving after eating it. A simple logically-sound inference from the evidence passes.' },
   { id: 1,  tier: 1, titleKey: 'claim.1.title',
     evidence: function(n) { return n.deaths.some(function(d){ return d.causeId === 'kcn_ingestion'; }); },
     rubric: 'Player states a causal link between the white powder and a death. A survival claim or vague wording fails.' },
-  { id: 3,  tier: 1, titleKey: 'claim.3.title',
-    evidence: function(n) { return n.berryCleanEatenSurvived === true; },
-    rubric: 'Player claims the red berry is safe AND specifies that safety depends on the berry being uncontaminated / clean-handed.' },
-  { id: 2,  tier: 2, titleKey: 'claim.2.title',
+  { id: 2,  tier: 1, titleKey: 'claim.2.title',
     evidence: function(n) {
       var smelled = n.entries.some(function(e){ return (e.action.indexOf('smell') !== -1) && /powder|白色|粉末|kcn/i.test(e.target+e.result); });
       var died    = n.deaths.some(function(d){ return d.causeId === 'kcn_ingestion'; });
       return smelled && died;
     },
     rubric: 'Player identifies the white powder as potassium cyanide (KCN) by linking the bitter-almond smell to chemistry knowledge. Simply saying "poison" is not enough.' },
-  { id: 4,  tier: 3, titleKey: 'claim.4.title',
+  { id: 7,  tier: 1, titleKey: 'claim.7.title',
+    evidence: function(n) { return n.thermometerLocations.indexOf('above') !== -1 && n.thermometerLocations.indexOf('below') !== -1; },
+    rubric: 'Player states that above-ground and underground temperatures differ as a measurable fact, with specific values or direction (warmer/cooler).' },
+
+  // ---- Tier 2 (visible on leaderboard) ----
+  { id: 4,  tier: 2, titleKey: 'claim.4.title',
     evidence: function(n) {
       for (var k in n.observedBerryStages) {
         if (n.observedBerryStages[k].stages && n.observedBerryStages[k].stages.length >= 2) return true;
@@ -27,40 +61,42 @@ var CLAIM_DEFS = [
       return false;
     },
     rubric: 'Player describes the berry as passing through a sequence of distinct stages (fresh → overripe → rotting, etc.), not just "it changed".' },
+  { id: 5,  tier: 2, titleKey: 'claim.5.title',
+    evidence: function(n) { return n.thermometerLocations.indexOf('above') !== -1 && n.thermometerLocations.indexOf('below') !== -1; },
+    rubric: 'Player links the temperature difference between above- and below-ground to a difference in berry decay rate.' },
+  { id: 6,  tier: 2, titleKey: 'claim.6.title',
+    evidence: function(n) { return n.crossContaminationDeathSeen === true; },
+    rubric: 'Player identifies contact transfer (residue on hands/surfaces) as the mechanism behind a death where the victim did not touch the powder directly.' },
+
+  // ---- Tier 3 (HIDDEN on leaderboard until individually validated) ----
   { id: 8,  tier: 3, titleKey: 'claim.8.title',
     evidence: function(n) { return n.dayNightCycles >= 2 && n.skyObservations.length >= 3; },
     rubric: 'Player distinguishes the relative speeds of specific celestial bodies (sun vs moon vs stars). Generic "things in the sky move" fails.' },
-  { id: 5,  tier: 4, titleKey: 'claim.5.title',
-    evidence: function(n) { return n.thermometerLocations.indexOf('above') !== -1 && n.thermometerLocations.indexOf('below') !== -1; },
-    rubric: 'Player links the temperature difference between above- and below-ground to a difference in berry decay rate.' },
-  { id: 6,  tier: 4, titleKey: 'claim.6.title',
-    evidence: function(n) { return n.crossContaminationDeathSeen === true; },
-    rubric: 'Player identifies contact transfer (residue on hands/surfaces) as the mechanism behind a death where the victim did not touch the powder directly.' },
-  { id: 7,  tier: 4, titleKey: 'claim.7.title',
-    evidence: function(n) { return n.thermometerLocations.indexOf('above') !== -1 && n.thermometerLocations.indexOf('below') !== -1; },
-    rubric: 'Player states that above-ground and underground temperatures differ as a measurable fact, with specific values or direction (warmer/cooler).' },
-  { id: 9,  tier: 5, titleKey: 'claim.9.title',
+  { id: 9,  tier: 3, titleKey: 'claim.9.title',
     evidence: function(n) { return n.dayNightCycles >= 2; },
     rubric: 'Player identifies a common rotational axis or center shared by sun/moon/stars.' },
-  { id: 10, tier: 5, titleKey: 'claim.10.title',
+  { id: 10, tier: 3, titleKey: 'claim.10.title',
     evidence: function(n) { return n.pbcCrossed === true; },
     rubric: 'Player describes the world\'s looping topology (walk far enough in one direction and return) — not merely "I ended up back here".' },
-  { id: 11, tier: 5, titleKey: 'claim.11.title',
+  { id: 11, tier: 3, titleKey: 'claim.11.title',
     evidence: function(n) { return n.pbcCrossed === true; },
     rubric: 'Player articulates that the world is flat, citing an observation inconsistent with a sphere (no horizon curvature, no disappearance bottom-first, PBC wrap).' },
-  { id: 12, tier: 6, titleKey: 'claim.12.title',
+  { id: 12, tier: 3, titleKey: 'claim.12.title',
     evidence: function(n) { return n.skyObservations.some(function(s){ return s.isNight; }); },
     rubric: 'Player names at least one specific real-world constellation visible in the night sky (Orion, Big Dipper, Cassiopeia, etc.).' },
-  { id: 13, tier: 6, titleKey: 'claim.13.title',
+  { id: 13, tier: 3, titleKey: 'claim.13.title',
     evidence: function(n) { return n.skyObservations.some(function(s){ return s.isNight; }); },
     rubric: 'Player identifies that the world is in the northern hemisphere — cites Polaris or a northern-only constellation.' },
-  { id: 14, tier: 6, titleKey: 'claim.14.title',
-    // External-knowledge claim — must have observed night sky at least once
-    // before the system will offer to scaffold this. Otherwise the player
-    // has no basis even to formulate it.
+  { id: 14, tier: 3, titleKey: 'claim.14.title',
+    // External-knowledge claim — needs night-sky observation as precondition.
     evidence: function(n) { return n.skyObservations && n.skyObservations.some(function(o){ return o.isNight; }); },
     rubric: 'Player states an approximate latitude (~40°N) with reasoning, e.g. the altitude of Polaris ≈ observer latitude.' }
 ];
+
+// Visible tiers on the leaderboard. Tier 3 is hidden; its claims appear
+// individually only after each is validated. Free-form (non-canonical)
+// validated claims appear in their own "Player Discoveries" section.
+var LEADERBOARD_VISIBLE_TIERS = [1, 2];
 
 function getClaimDef(id) {
   for (var i = 0; i < CLAIM_DEFS.length; i++) if (CLAIM_DEFS[i].id === id) return CLAIM_DEFS[i];
@@ -274,18 +310,17 @@ function enqueueCerEntry(claimId, gateMetAt) {
   return entry;
 }
 
-// Scan all 14 claims; enqueue any whose gate is met but not yet on the board.
-// Called after any state mutation that could satisfy a gate (sense action,
-// death, day-night cycle increment, PBC crossing, thermometer reading).
+// Scan visible-tier claims; enqueue any whose gate is met but not yet on
+// the board. Hidden-tier (tier 3) claims are NOT auto-enqueued — players
+// must discover and articulate them via the "+ New Claim" button. Their
+// evidence gates still operate (used by the leaderboard once validated).
 function checkAndEnqueueGates() {
   var queued = [];
   for (var i = 0; i < CLAIM_DEFS.length; i++) {
     var def = CLAIM_DEFS[i];
+    if (LEADERBOARD_VISIBLE_TIERS.indexOf(def.tier) === -1) continue;
     if (_hasEntryForClaim(def.id)) continue;
     if (def.evidence(G.notebook)) {
-      // Use gameTime as the gate-met timestamp. For the first batch of
-      // multiple gates met simultaneously, this also forms a deterministic
-      // tie-break by claim ID order (we iterate CLAIM_DEFS sequentially).
       enqueueCerEntry(def.id, G.gameTime);
       queued.push(def.id);
     }
@@ -355,7 +390,18 @@ function renderCerBoard() {
   intro.textContent = L('cer.intro');
   content.appendChild(intro);
 
-  var entries = G.notebook.cerEntries || [];
+  // Filter out hidden-tier auto-enqueued entries that haven't been
+  // engaged with. Player-authored entries (no enqueuedAt) and any
+  // entry the player edited/validated remain visible.
+  var entries = (G.notebook.cerEntries || []).filter(function(e) {
+    if (!e.claimId) return true;                 // free-form: always show
+    var def = getClaimDef(e.claimId);
+    if (!def || def.tier !== 3) return true;     // visible tier: always show
+    if (e.validated) return true;                // validated: always show
+    if (e.claim || e.reasoning) return true;     // player engaged: keep
+    if (!e.enqueuedAt) return true;              // not auto-enqueued: keep
+    return false;                                // auto-enqueued tier 3, untouched: hide
+  });
   if (entries.length === 0) {
     var empty = document.createElement('div');
     empty.style.cssText = 'color:#555;text-align:center;padding:40px;';
@@ -500,13 +546,16 @@ function submitCerEntry(entry) {
     renderNotebook();
     return;
   }
-  // Determine claim id if not set
+  // Determine claim id via lexical shortlist
   if (!entry.claimId) {
     entry.claimId = matchClaimId(entry.claim + ' ' + entry.reasoning);
   }
+  // Free-form path: player is making a non-canonical claim. Evaluate
+  // logical soundness rather than rubric match.
   if (!entry.claimId) {
-    entry._feedback = L('cer.no_match');
+    entry._feedback = L('cer.evaluating');
     renderNotebook();
+    evaluateFreeFormCer(entry);
     return;
   }
   var def = getClaimDef(entry.claimId);
@@ -579,6 +628,93 @@ function evaluateArticulationHolistic(entry, def) {
   }).catch(function() {
     finalizeCer(entry, false, L('cer.eval_error'));
   });
+}
+
+// Free-form path: player submitted a claim outside the 14 canonical ones.
+// Grader judges LOGICAL SOUNDNESS of the CER chain — does the evidence
+// actually support the claim, and is the reasoning structurally valid?
+// If pass: the entry joins G.notebook.freeFormValidatedClaims and
+// appears in the leaderboard's "Player Discoveries" section.
+function evaluateFreeFormCer(entry) {
+  var hasKey = (typeof IS_LOCAL !== 'undefined') && IS_LOCAL &&
+               (typeof LOCAL_CONFIG !== 'undefined') && LOCAL_CONFIG.ANTHROPIC_API_KEY &&
+               LOCAL_CONFIG.ANTHROPIC_API_KEY.indexOf('sk-ant-') === 0;
+
+  if (!hasKey) {
+    var wc = (entry.claim + entry.reasoning).split(/\s+/).length;
+    finalizeFreeFormCer(entry, wc >= 12, L('cer.offline_note'));
+    return;
+  }
+
+  var prompt =
+    'You are grading a free-form CER (Claim-Evidence-Reasoning) entry from a player in a science discovery game.\n' +
+    'The player is making a claim NOT on the game\'s canonical list. Your job is to judge whether the CER chain is LOGICALLY SOUND.\n\n' +
+    'Criteria:\n' +
+    '1. Does the Evidence actually support the Claim (not merely describe an unrelated observation)?\n' +
+    '2. Is the Reasoning a valid inferential step from Evidence to Claim?\n' +
+    '3. Does the Claim reference something internally consistent with what could be observed in a game world?\n' +
+    'You do NOT need to judge whether the claim is "true" in the real world — only whether the argument is coherent.\n\n' +
+    'STUDENT ENTRY:\n' +
+    'Claim: '     + entry.claim     + '\n' +
+    'Evidence: '  + entry.evidence  + '\n' +
+    'Reasoning: ' + entry.reasoning + '\n\n' +
+    'Respond with a JSON object on a single line: {"pass": true|false, "note": "one short sentence of feedback"}\n' +
+    'PASS only if all three criteria are met. Be strict about evidence-claim fit. Do not reveal game answers.';
+
+  fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': LOCAL_CONFIG.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 150,
+      system: 'You are a terse, fair grader of logical soundness. Respond ONLY with a single JSON object.',
+      messages: [{ role: 'user', content: prompt }]
+    })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var text = (data && data.content && data.content[0] && data.content[0].text) || '';
+    var m = text.match(/\{[\s\S]*\}/);
+    var pass = false, note = L('cer.eval_unparseable');
+    if (m) {
+      try {
+        var obj = JSON.parse(m[0]);
+        pass = !!obj.pass;
+        if (obj.note) note = obj.note;
+      } catch(e) {}
+    }
+    finalizeFreeFormCer(entry, pass, note);
+  }).catch(function() {
+    finalizeFreeFormCer(entry, false, L('cer.eval_error'));
+  });
+}
+
+function finalizeFreeFormCer(entry, pass, note) {
+  entry._feedback = (pass ? '✓ ' : '✗ ') + note;
+  if (pass) {
+    entry.validated = true;
+    if (!G.notebook.freeFormValidatedClaims) G.notebook.freeFormValidatedClaims = [];
+    // Dedup by claim text
+    var seen = false;
+    for (var i = 0; i < G.notebook.freeFormValidatedClaims.length; i++) {
+      if (G.notebook.freeFormValidatedClaims[i].claim === entry.claim) { seen = true; break; }
+    }
+    if (!seen) {
+      G.notebook.freeFormValidatedClaims.push({
+        claim: entry.claim,
+        evidence: entry.evidence,
+        reasoning: entry.reasoning,
+        characterName: (G.currentCharacter && G.currentCharacter.name) || 'Unknown',
+        timestamp: G.gameTime
+      });
+      showDiscoveryNotification(entry.claim);
+    }
+  }
+  if (typeof saveGame === 'function') saveGame();
+  renderNotebook();
 }
 
 function finalizeCer(entry, pass, note) {
