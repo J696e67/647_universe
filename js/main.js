@@ -81,7 +81,7 @@ var G = window.G = {
   paused: false,
 
   // Character state (Phase 4)
-  characterNames: ['Alice','Tylor','Mira','Kenji','Priya','Leo','Sofia','Ren','Kai','Noor'],
+  characterNames: ['Amara','Bodhi','Catalina','Deshi','Emre','Femi','Gael','Hana','Idris','Juno','Kavi','Lior','Maren','Nico','Olena','Priya','Quinn','Reza','Sora','Tala','Umi','Vega','Wren','Xiu','Yael','Zara'],
   characterIndex: 0,
   currentCharacter: null,
   alive: true,
