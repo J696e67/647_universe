@@ -92,7 +92,7 @@ function buildMazeGeometry() {
   function addQuad(x0,y0,z0, x1,y1,z1, x2,y2,z2, x3,y3,z3, nx,ny,nz) {
     positions.push(x0,y0,z0, x1,y1,z1, x2,y2,z2, x3,y3,z3);
     norms.push(nx,ny,nz, nx,ny,nz, nx,ny,nz, nx,ny,nz);
-    indices.push(vc,vc+1,vc+2, vc,vc+2,vc+3); vc += 4;
+    indices.push(vc,vc+2,vc+1, vc,vc+3,vc+2); vc += 4;
   }
 
   for (var ti = 0; ti < offsets.length; ti++) {
@@ -104,8 +104,8 @@ function buildMazeGeometry() {
 
         // ── H-wall: 3 faces (south, north, top), no end caps ──
         if (G.mazeH[r][c]) {
-          var hx0 = c*G.MCELL - G.MHALF + ox;
-          var hx1 = (c+1)*G.MCELL - G.MHALF + ox;
+          var hx0 = c*G.MCELL + hw - G.MHALF + ox;
+          var hx1 = (c+1)*G.MCELL - hw - G.MHALF + ox;
           var hz  = (r+1)*G.MCELL - G.MHALF + oz;
           addQuad(hx0,y0,hz-hw, hx1,y0,hz-hw, hx1,y1,hz-hw, hx0,y1,hz-hw, 0,0,-1);
           addQuad(hx1,y0,hz+hw, hx0,y0,hz+hw, hx0,y1,hz+hw, hx1,y1,hz+hw, 0,0, 1);
@@ -115,8 +115,8 @@ function buildMazeGeometry() {
         // ── V-wall: 3 faces (west, east, top), no end caps ──
         if (G.mazeV[r][c]) {
           var vx  = (c+1)*G.MCELL - G.MHALF + ox;
-          var vz0 = r*G.MCELL - G.MHALF + oz;
-          var vz1 = (r+1)*G.MCELL - G.MHALF + oz;
+          var vz0 = r*G.MCELL + hw - G.MHALF + oz;
+          var vz1 = (r+1)*G.MCELL - hw - G.MHALF + oz;
           addQuad(vx-hw,y0,vz1, vx-hw,y0,vz0, vx-hw,y1,vz0, vx-hw,y1,vz1, -1,0,0);
           addQuad(vx+hw,y0,vz0, vx+hw,y0,vz1, vx+hw,y1,vz1, vx+hw,y1,vz0,  1,0,0);
           addQuad(vx-hw,y1,vz0, vx+hw,y1,vz0, vx+hw,y1,vz1, vx-hw,y1,vz1,  0,1,0);
@@ -131,10 +131,7 @@ function buildMazeGeometry() {
         var wU = G.mazeV[r][c];           // south (lower z)
         var wD = G.mazeV[pRD][c];         // north (higher z)
         if (!wL && !wR && !wU && !wD) continue;
-        // Straight-through: two collinear walls, no turn → walls already seamless
-        if (wL && wR && !wU && !wD) continue;
-        if (wU && wD && !wL && !wR) continue;
-        // All other cases (L / T / + / dead-end): render corner block.
+        // All cases with ≥1 wall: render corner post.
         // Only faces toward open directions (no wall) are rendered.
         var px = (c+1)*G.MCELL - G.MHALF + ox;
         var pz = (r+1)*G.MCELL - G.MHALF + oz;
